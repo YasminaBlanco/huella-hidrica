@@ -1,0 +1,24 @@
+# Entorno virtual
+venv/
+ENV/
+env/
+
+# Archivos de Python compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Directorio de scripts (si no quieres trackearlo)
+scripts/
+
+# Variables de entorno
+.env
+
+# Archivos de configuración del editor
+.vscode/
+.idea/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
