@@ -436,30 +436,78 @@ async def ingest_open_meteo(
         "uploaded_files": uploaded_files
     }
 
+@app.get("/ingest/jmp")
+def ingest_jmp_data(
+    csv_path: str = Query("data/jmp_latam_2019_2024.csv", description="ruta local del archivo JMP csv"),
+):
+    """
+    Ingesta del dataset JMP (WHO/UNICEF) desde un archivo CSV local.
+    
+    """
 
-# @app.post("/ingest/jmp-upload")
-# def ingest_jmp_data(file_path: str):
-#     if not os.path.exists(file_path):
-#         raise HTTPException(status_code=404, detail=f"Archivo no encontrado localmente: {file_path}")
+    if not os.path.exists(csv_path):
+        raise HTTPException(status_code=404, detail=f"Archivo CSV no encontrado: {csv_path}")
 
-#     try:
-#         if file_path.endswith('.csv'):
-#             df = pd.read_csv(file_path)
-#         elif file_path.endswith('.xlsx'):
-#             df = pd.read_excel(file_path)
-#         else:
-#             raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Use .csv o .xlsx")
-            
-#         # Cargar a S3
-#         file_key = f"{S3_BRONZE_PREFIX}jmp/jmp_data_{os.path.basename(file_path)}_{date.today().isoformat()}.parquet"
-        
-#         # Usamos parquet para la capa bronze si es posible, es más eficiente.
-#         parquet_buffer = io.BytesIO()
-#         df.to_parquet(parquet_buffer, index=False)
-        
-#         s3_path = upload_to_s3(parquet_buffer.getvalue(), file_key, content_type='application/octet-stream')
+    try:
+        df = pd.read_csv(csv_path)
+        # todo --> reemplazr por llamada a la api jmp
 
-#         return {"status": "success", "source": "JMP Data", "s3_path_bronze": s3_path, "rows_ingested": len(df)}
+        required_cols = ["ISO3", "Country", "Residence Type", "Service Type",
+                         "Service level", "Year", "Coverage", "Population"]
 
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error procesando el archivo: {str(e)}")
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El dataset JMP no contiene las columnas requeridas: {missing}"
+            )
+
+        df["Year"] = pd.to_numeric(df["Year"], errors="coerce").astype("Int64")
+        df["Coverage"] = pd.to_numeric(df["Coverage"], errors="coerce")
+        df["Population"] = pd.to_numeric(df["Population"], errors="coerce")
+
+        uploaded_files = []
+
+        for iso3 in df["ISO3"].unique():
+            country_df = df[df["ISO3"] == iso3]
+
+            for year in country_df["Year"].unique():
+                partition_df = country_df[country_df["Year"] == year].copy()
+
+                if partition_df.empty:
+                    continue
+
+                buf = io.BytesIO()
+                partition_df.to_parquet(buf, index=False, compression="snappy")
+                buf.seek(0)
+
+                file_key = (
+                    f"{S3_BRONZE_PREFIX}/jmp/"
+                    f"country={iso3}/year={int(year)}/jmp.parquet"
+                )
+
+                s3_path = upload_to_s3(
+                    buf.getvalue(),
+                    key=file_key,
+                    content_type="application/octet-stream",
+                    metadata={
+                        "source": "jmp",
+                        "layer": "bronze",
+                        "country": iso3
+                    }
+                )
+
+                uploaded_files.append(s3_path)
+
+        return {
+            "status": "success",
+            "rows": len(df),
+            "countries_detected": df["ISO3"].unique().tolist(),
+            "years_detected": sorted(df["Year"].dropna().unique().tolist()),
+            "total_files_uploaded": len(uploaded_files),
+            "files": uploaded_files,
+            "sample": df.head(5).to_dict(orient="records")
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error procesando JMP: {str(e)}")
