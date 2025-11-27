@@ -1,0 +1,70 @@
+name: CI Pipeline - Code Quality
+
+# Se ejecuta en cada Push o PR hacia la rama main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  python-linting:
+    name: Python Linting & Code Style
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Configurar Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Instalar dependencias de desarrollo
+      run: |
+        python -m pip install --upgrade pip
+        # Herramientas de calidad sugeridas por el mentor
+        pip install flake8 black isort
+
+    - name: Verificar estilo con Black (Formatting)
+      # --check valida que el código esté bien formateado "sin modificarlo"
+      run: |
+        echo "Ejecutando Black..."
+        black --check .
+
+    - name: Ordenar imports con Isort
+      run: |
+        echo "Verificando orden de imports..."
+        isort --check-only --profile black .
+
+    - name: Analizar sintaxis con Flake8 (Linting)
+      # Detecta errores de sintaxis y variables no usadas
+      # Excluimos carpetas que no son código fuente nuestro
+      run: |
+        echo "Ejecutando Flake8..."
+        # Agregamos spark-elt a la lista de excluidos
+        flake8 . --count ... --exclude=venv,infra,.git,__pycache__,spark-elt
+
+  # -----------------------------------------------------------------------
+  # ATENCION: Descomentar este bloque cuando Lupita fusione su código de Infraestructura (TF)
+  # -----------------------------------------------------------------------
+  # terraform-validation:
+  #   name: Terraform Validation
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: ./infra  <-- Ajustar si Lupita usa otro nombre de carpeta
+  #
+  #   steps:
+  #   - name: Checkout del código
+  #     uses: actions/checkout@v3
+  #
+  #   - name: Setup Terraform
+  #     uses: hashicorp/setup-terraform@v2
+  #
+  #   - name: Terraform Init
+  #     run: terraform init -backend=false
+  #
+  #   - name: Terraform Validate
+  #     run: terraform validate
