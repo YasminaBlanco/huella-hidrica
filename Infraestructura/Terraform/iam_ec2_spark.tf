@@ -1,6 +1,6 @@
 
 # ----------------------------------------
-# Role IAM para EC2 con acceso S3
+# Role IAM para EC2 con acceso S3 
 # ---------------------------------------
 
 resource "aws_iam_role" "ec2_spark_s3_role" {
@@ -27,10 +27,50 @@ resource "aws_iam_role" "ec2_spark_s3_role" {
   }
 }
 
-# Adjuntar política AmazonS3FullAccess
-resource "aws_iam_role_policy_attachment" "ec2_spark_s3_full_access" {
+# Política personalizada de mínimo privilegio 
+resource "aws_iam_policy" "ec2_spark_s3_least_priv" {
+  name        = "ec2-spark-s3-least-priv"
+  description = "Acceso mínimo desde EC2 (Spark) al bucket henry-pf-g2-huella-hidrica"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Permitir listar solo ese bucket y obtener su región
+      {
+        Sid    = "ListBucket"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = "arn:aws:s3:::henry-pf-g2-huella-hidrica"
+      },
+
+      # Permitir leer/escribir objetos solo en estos prefijos
+      {
+        Sid    = "RWDataObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::henry-pf-g2-huella-hidrica/bronze/*",
+          "arn:aws:s3:::henry-pf-g2-huella-hidrica/silver/*",
+          "arn:aws:s3:::henry-pf-g2-huella-hidrica/gold/*",
+          "arn:aws:s3:::henry-pf-g2-huella-hidrica/logs/*",
+          "arn:aws:s3:::henry-pf-g2-huella-hidrica/scripts/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Adjuntar la política personalizada al role
+resource "aws_iam_role_policy_attachment" "ec2_spark_s3_attach" {
   role       = aws_iam_role.ec2_spark_s3_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  policy_arn = aws_iam_policy.ec2_spark_s3_least_priv.arn
 }
 
 # Instance Profile que usará la instancia EC2
