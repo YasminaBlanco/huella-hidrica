@@ -5,3 +5,13 @@
 .terraform.lock.hcl
 var.tfvars
 *.tfvars
+
+venv/
+.env
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+
+infra/
+notebooks/
+spark-elt/

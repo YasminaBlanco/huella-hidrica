@@ -12,15 +12,22 @@ resource "aws_iam_role" "spark_processor_role" {
       }
     }]
   })
+
+  # INTEGRACIÓN: Agrego los tags de Lupita (Best Practice)
+  tags = {
+    Name        = "henry_spark_processor_role_dev"
+    Project     = "huella-hidrica"
+    Environment = "dev"
+  }
 }
 
-# 2. Dar permisos FULL sobre S3 (Para leer Bronze y escribir Silver)
+# 2. Dar permisos FULL sobre S3
 resource "aws_iam_role_policy_attachment" "s3_access" {
   role       = aws_iam_role.spark_processor_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
-# 3. Creación del "Perfil de Instancia" (El enchufe para la EC2)
+# 3. Creación del "Perfil de Instancia"
 resource "aws_iam_instance_profile" "spark_profile" {
   name = "henry_spark_profile_dev"
   role = aws_iam_role.spark_processor_role.name
