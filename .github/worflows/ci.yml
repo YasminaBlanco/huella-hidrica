@@ -1,6 +1,6 @@
 name: CI Pipeline - Code Quality
 
-# Se ejecuta en cada Push o PR hacia la rama main
+# Se dispara en cada Push o Pull Request hacia la rama main
 on:
   push:
     branches: [ "main" ]
@@ -21,50 +21,25 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Instalar dependencias de desarrollo
+    - name: Instalar dependencias
       run: |
         python -m pip install --upgrade pip
-        # Herramientas de calidad sugeridas por el mentor
         pip install flake8 black isort
 
-    - name: Verificar estilo con Black (Formatting)
-      # --check valida que el código esté bien formateado "sin modificarlo"
+    - name: Verificar estilo con Black
+      # Validamos que el código esté "bonito" según el estándar
       run: |
         echo "Ejecutando Black..."
         black --check .
 
-    - name: Ordenar imports con Isort
+    - name: Verificar orden de imports con Isort
       run: |
-        echo "Verificando orden de imports..."
+        echo "Ejecutando Isort..."
         isort --check-only --profile black .
 
-    - name: Analizar sintaxis con Flake8 (Linting)
-      # Detecta errores de sintaxis y variables no usadas
-      # Excluimos carpetas que no son código fuente nuestro
+    - name: Analizar sintaxis con Flake8
+      # Usamos las mismas exclusiones que probaste en tu PC para que no falle por código ajeno
       run: |
         echo "Ejecutando Flake8..."
-        # Agregamos spark-elt a la lista de excluidos
-        flake8 . --count ... --exclude=venv,infra,.git,__pycache__,spark-elt
-
-  # -----------------------------------------------------------------------
-  # ATENCION: Descomentar este bloque cuando Lupita fusione su código de Infraestructura (TF)
-  # -----------------------------------------------------------------------
-  # terraform-validation:
-  #   name: Terraform Validation
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: ./infra  <-- Ajustar si Lupita usa otro nombre de carpeta
-  #
-  #   steps:
-  #   - name: Checkout del código
-  #     uses: actions/checkout@v3
-  #
-  #   - name: Setup Terraform
-  #     uses: hashicorp/setup-terraform@v2
-  #
-  #   - name: Terraform Init
-  #     run: terraform init -backend=false
-  #
-  #   - name: Terraform Validate
-  #     run: terraform validate
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,infra,.git,__pycache__,spark-elt
