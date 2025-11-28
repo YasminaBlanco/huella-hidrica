@@ -1,0 +1,43 @@
+name: CI Pipeline - Code Quality
+
+# Se dispara en cada Push o Pull Request hacia la rama main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  python-linting:
+    name: Python Linting & Code Style
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Configurar Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
+
+    - name: Black
+      run: |
+        echo "Ejecutando Black..."
+        black --check .
+
+    - name: Isort
+      run: |
+        echo "Ejecutando Isort..."
+        isort --check-only --profile black .
+
+    - name: Flake8
+      run: |
+        echo "Ejecutando Flake8..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=126 --statistics --exclude=venv,infra,.git,__pycache__,spark-elt
