@@ -1,6 +1,5 @@
-name: CI Pipeline - Code Quality
+name: CI Pipeline
 
-# Se dispara en cada Push o Pull Request hacia la rama main
 on:
   push:
     branches: [ "ingest-api" ]
