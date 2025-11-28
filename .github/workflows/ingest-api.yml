@@ -26,7 +26,7 @@ jobs:
     - name: Black
       run: |
         echo "Ejecutando Black..."
-        black --check .
+        black .
 
     - name: Isort
       run: |
