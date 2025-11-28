@@ -3,7 +3,7 @@ name: CI Pipeline - Code Quality
 # Se dispara en cada Push o Pull Request hacia la rama main
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "ingest-api" ]
   pull_request:
     branches: [ "main" ]
 
