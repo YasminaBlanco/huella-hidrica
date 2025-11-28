@@ -1,103 +1,97 @@
-# 🚀 Implementación de Pipeline ETL Serverless & CI/CD
+# 🚀 Despliegue de Infraestructura Cloud (IaC) & CI/CD
 
-**Rama:** `feature/configuracion-inicial-ale`
+**Rama:** `feature/infra-ci-ale`
 **Responsable:** Alejandro Nelson Herrera Soria
-**Tickets Asociados:** `KAN-34` (AWS Glue), `KAN-33` (CI/CD)
-
------
+**Tickets Asociados:** `KAN-35` (Terraform Infra), `KAN-33` (CI/CD)
 
 ## 📑 Tabla de Contenidos
 
 1.  [Resumen Ejecutivo](https://www.google.com/search?q=%23-resumen-ejecutivo)
 2.  [Arquitectura y Decisiones de Diseño](https://www.google.com/search?q=%23-arquitectura-y-decisiones-de-dise%C3%B1o)
-3.  [Detalle de Implementación: ETL con AWS Glue](https://www.google.com/search?q=%23-detalle-de-implementaci%C3%B3n-etl-con-aws-glue)
+3.  [Detalle de Implementación: Infraestructura (Terraform)](https://www.google.com/search?q=%23-detalle-de-implementaci%C3%B3n-infraestructura-terraform)
 4.  [Detalle de Implementación: CI/CD Pipeline](https://www.google.com/search?q=%23-detalle-de-implementaci%C3%B3n-cicd-pipeline)
-5.  [Desafíos Técnicos y Soluciones (Troubleshooting)](https://www.google.com/search?q=%23-desaf%C3%ADos-t%C3%A9cnicos-y-soluciones)
+5.  [Desafíos Técnicos y Soluciones](https://www.google.com/search?q=%23-desaf%C3%ADos-t%C3%A9cnicos-y-soluciones-troubleshooting)
 6.  [Estructura del Código](https://www.google.com/search?q=%23-estructura-del-c%C3%B3digo)
 
 -----
 
 ## 📋 Resumen Ejecutivo
 
-Esta rama consolida la infraestructura de procesamiento de datos y control de calidad del proyecto. Se ha implementado un **Pipeline ETL Serverless** utilizando **AWS Glue** para la transformación de datos crudos (Bronze) a datos limpios y optimizados (Silver), y se ha establecido un flujo de **Integración Continua (CI)** mediante **GitHub Actions** para garantizar la estandarización del código Python.
+Esta rama marca la transición del proyecto hacia un entorno de nube profesional. Se ha implementado **Infraestructura como Código (IaC)** utilizando **Terraform** para aprovisionar una flota de servidores EC2 optimizados para Ingesta, Orquestación y Procesamiento en AWS (Región Ohio `us-east-2`).
+
+Adicionalmente, se ha establecido un flujo de **Integración Continua (CI)** mediante **GitHub Actions** que valida la calidad del código en todas las ramas de desarrollo, asegurando estándares de Python alineados con la infraestructura desplegada.
 
 -----
 
 ## 🏗 Arquitectura y Decisiones de Diseño
 
-### 1\. Procesamiento Serverless con AWS Glue (KAN-34)
+### 1\. Cómputo Especializado (EC2 Fleet)
 
-Optamos por **AWS Glue** (sobre soluciones basadas en EC2 como Airflow workers) basándonos en tres pilares:
+En lugar de una arquitectura genérica, diseñamos una flota de instancias optimizada por función para balancear **Rendimiento vs. Costo**:
 
-  * **Escalabilidad Horizontal:** Glue gestiona automáticamente los recursos (Workers/Executors) de Spark. Si el volumen de datos crece de Gigabytes a Terabytes, el Job escala sin intervención manual.
-  * **Optimización de Costos:** Modelo de pago por uso (Serverless). Solo incurrimos en costos durante los minutos de ejecución del ETL, evitando el gasto de servidores EC2 ociosos las 24 horas.
-  * **Mantenibilidad:** Se elimina la carga operativa de parchear sistemas operativos, gestionar memoria RAM o configurar clústeres de Spark manualmente.
+  * **API de Ingesta:** Instancia `t3.micro`. Aprovecha la capa gratuita para servicios ligeros de entrada de datos.
+  * **Orquestador (Airflow):** Instancia **`c7i-flex.large`** (Compute Optimized) con **4GB RAM**.
+      * *Decisión:* Se escaló a esta instancia para soportar la carga concurrente de múltiples DAGs sin latencia.
+      * *Almacenamiento:* Disco **EBS gp3 de 30GB** para manejar logs y metadatos sin saturación.
+  * **Worker de Procesamiento (Spark):** Instancia **`m7i-flex.large`** (General Purpose) con **8GB RAM**.
+      * *Decisión:* Necesaria para manejar cargas de trabajo intensivas en memoria durante la transformación de datos (Huella Hídrica).
+      * *Almacenamiento:* Disco **EBS gp3 de 50GB** para soportar el "spill to disk" de Spark y almacenamiento de imágenes Docker.
 
-### 2\. Almacenamiento Optimizado (Silver Layer)
+### 2\. Aprovisionamiento Automatizado (Zero-Touch Provisioning)
 
-  * **Formato:** **Parquet**. Elegido por su naturaleza columnar, ideal para consultas analíticas (OLAP), reduciendo drásticamente el tiempo de I/O comparado con CSV o JSON.
-  * **Compresión:** **Snappy**. Ofrece el mejor balance entre ratio de compresión y velocidad de descompresión para ecosistemas Hadoop/Spark.
-  * **Particionamiento:** Datos organizados por `year` o `province` para habilitar el *Partition Pruning* en consultas futuras (Athena/PowerBI), minimizando costos de escaneo.
+Se eliminó la configuración manual de servidores. Mediante el uso de **Terraform `user_data`**, todas las instancias se despliegan con un script de inicialización (`install_docker.sh`) que:
 
-### 3\. Calidad de Código Automatizada (KAN-33)
+  * Actualiza el sistema operativo (Ubuntu 22.04).
+  * Instala **Docker** y **Docker Compose**.
+  * Configura permisos de usuario y Git.
+  * *Beneficio:* El equipo puede empezar a trabajar inmediatamente después del despliegue sin perder tiempo configurando entornos.
 
-Implementamos un **Quality Gate** en el repositorio para prevenir deuda técnica:
+### 3\. Calidad de Código Automatizada
 
-  * **Linter:** `flake8` para detección temprana de errores de sintaxis y bugs potenciales.
-  * **Formatter:** `black` para asegurar un estilo de código consistente y legible (PEP 8).
-  * **Import Sorter:** `isort` para organizar dependencias.
+Se implementó un pipeline de CI agnóstico al entorno local:
+
+  * **Validación Multi-rama:** El pipeline se ejecuta en cualquier branch (`**`), no solo en `main`, previniendo la integración de código defectuoso desde etapas tempranas.
+  * **Entorno de Producción Simulado:** Los tests corren sobre **Python 3.10**, replicando la versión nativa de los servidores Ubuntu 22.04 en AWS.
 
 -----
 
-## 🛠 Detalle de Implementación: ETL con AWS Glue
+## 🛠 Detalle de Implementación: Infraestructura (Terraform)
 
-Los scripts de ETL (`src/glue/`) realizan la transición **Bronze → Silver** aplicando las siguientes reglas de negocio y limpieza técnica:
+El código de infraestructura se encuentra en el directorio `infra/` y sigue un enfoque modular:
 
-1.  **Esquema Dictatorial (Schema Enforcement):**
-
-      * Se definen esquemas manuales (`StructType`) para cada fuente. Esto blinda al pipeline contra el *Schema Drift* (cambios inesperados en los tipos de datos de la fuente).
-      * Se ignoran columnas técnicas irrelevantes o corruptas del origen.
-
-2.  **Normalización de Tipos:**
-
-      * Casteo explícito de campos numéricos (`Double`, `Long`) y fechas.
-      * Manejo de inconsistencias en la ingesta (ej. fechas guardadas como `INT64`).
-
-3.  **Estandarización de Nombres:**
-
-      * Conversión de columnas a `snake_case` (ej. `Country Name` → `country_name`) para facilitar el uso en SQL.
-
-**Jobs Desarrollados:**
-
-  * `job_bronze_to_silver_world_bank.py`: Procesa indicadores socioeconómicos.
-  * `job_bronze_to_silver_jmp.py`: Procesa datos de Agua y Saneamiento (WHO/UNICEF).
-  * `job_bronze_to_silver_weather.py`: Procesa datos climáticos históricos (Open-Meteo).
+  * **`compute.tf`**: Define la creación de las 3 instancias EC2, asignación de discos `gp3`, inyección de scripts `user_data` y asociación de Security Groups.
+  * **`iam.tf`**: Gestiona Roles y Perfiles de Instancia (IAM) para permitir que los servidores accedan a S3 sin necesidad de hardcodear credenciales (AWS Access Keys) en el código.
+  * **`storage.tf`**: Define la estructura del Data Lake en S3 (Buckets y carpetas para capas Bronze/Silver/Gold).
+  * **`variables.tf`**: Centraliza la configuración (Región, AMIs, Tipos de Instancia), permitiendo cambios rápidos de hardware sin tocar el código lógico.
+  * **`provider.tf`**: Configuración del proveedor AWS y versiones de Terraform.
+  * **`install_docker.sh`**: Script Bash inyectado en las instancias al momento del arranque (`boot`).
 
 -----
 
 ## 🔄 Detalle de Implementación: CI/CD Pipeline
 
-Se configuró un Workflow de GitHub Actions (`.github/workflows/ci.yml`) que se dispara automáticamente en cada `Push` o `Pull Request` hacia la rama `main`.
+Se configuró un Workflow de GitHub Actions (`.github/workflows/ci.yml`) estricto:
 
 **Pasos del Pipeline:**
 
-1.  Levanta un contenedor Ubuntu con Python 3.10.
-2.  Instala dependencias de calidad: `black`, `flake8`, `isort`.
-3.  Ejecuta formateo y linting sobre el código fuente en `src/`.
-4.  **Bloqueo:** Si se detectan errores críticos, el Pipeline falla, alertando al equipo antes de fusionar el código defectuoso.
+1.  **Trigger:** Push o Pull Request hacia cualquier rama.
+2.  **Setup:** Levanta contenedor Ubuntu con Python 3.10.
+3.  **Linter:** Ejecuta `flake8` para auditar sintaxis y deuda técnica.
+4.  **Testing:** Ejecuta `pytest` con descubrimiento automático de tests.
+5.  **Quality Gate:** Si algún paso falla, se bloquea la posibilidad de hacer Merge en GitHub.
 
 -----
 
 ## 💥 Desafíos Técnicos y Soluciones
 
-Durante el desarrollo nos enfrentamos a inconsistencias críticas en la capa Bronze (Ingesta). A continuación se documentan las soluciones aplicadas:
+Durante la fase de infraestructura nos enfrentamos a desafíos de gestión de estado y seguridad:
 
 | Desafío / Error | Causa Raíz | Solución Implementada |
 | :--- | :--- | :--- |
-| **Schema Drift / Merge Failure**<br>`[CANNOT_MERGE_SCHEMAS]` | Los archivos Parquet en Bronze tenían tipos de datos mixtos (ej. columna `scale` a veces era `INT`, a veces `STRING` o `NULL`) debido a la inferencia dinámica de Pandas en la ingesta. | Implementación de **Lectura con Esquema Manual** (`spark.read.schema(...)`). Esto fuerza a Spark a ignorar la inferencia y adherirse estrictamente al tipo de dato esperado. |
-| **Conflicto de Particiones**<br>`COLUMN_ALREADY_EXISTS` | Existencia de columnas en el archivo (ej. `country`) con el mismo nombre que las carpetas de partición (`country=ARG`), generando ambigüedad en el Catálogo de Datos. | Uso de **`recursiveFileLookup`** y lectura directa desde S3 (bypasseando el Catálogo de Glue) para ignorar la estructura de carpetas y leer solo el contenido de los archivos. |
-| **Formatos Híbridos**<br>`Not a Parquet file` | Se detectó que algunos datasets en la carpeta Bronze eran archivos CSV planos, a pesar de estar en una estructura de Data Lake. | Adaptación dinámica del lector de Spark (`.csv` con headers) dentro del Job de JMP, manteniendo la salida estandarizada en Parquet para la capa Silver. |
-| **Inferencia de Fechas**<br>`INT64 vs Timestamp` | Las fechas fueron guardadas como enteros (microsegundos) sin metadatos de tiempo. | Lectura inicial como `LongType` y transformación matemática (`col/1000000`) a `Timestamp` dentro del ETL. |
+| **InvalidKeyPair.NotFound** | Terraform intentaba usar una llave SSH creada en una región distinta o inexistente en `us-east-2`. | Unificación del nombre de la llave en `variables.tf` y recreación del KeyPair en la región correcta (Ohio). |
+| **Bloqueo por Disco Lleno** | Las instancias por defecto (8GB) fallaban al levantar contenedores Docker pesados y logs de Spark. | Implementación de bloques `root_block_device` en Terraform para aprovisionar discos **gp3** de 30GB y 50GB. |
+| **Configuración Manual Repetitiva** | Cada reinicio de instancia requería instalar librerías manualmente. | Automatización vía `user_data` con script Bash para instalar Docker/Git al inicio (`boot time`). |
+| **Gestión de Estado (State Lock)** | Riesgo de conflictos al trabajar infraestructura en equipo sin un Backend remoto. | Estrategia de **Code Freeze** para el Sprint 1 y uso de `terraform import` planificado para sincronizar recursos existentes (S3) en el Sprint 2. |
 
 -----
 
@@ -107,16 +101,16 @@ Durante el desarrollo nos enfrentamos a inconsistencias críticas en la capa Bro
 huella-hidrica/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml          # Definición del Pipeline de Calidad (GitHub Actions)
-├── src/
-│   └── glue/               # Scripts PySpark (ETL Jobs)
-│       ├── job_bronze_to_silver_world_bank.py
-│       ├── job_bronze_to_silver_jmp.py
-│       └── job_bronze_to_silver_weather.py
-├── .gitignore              # Exclusiones (venv, terraform state, etc.)
+│       └── ci.yml          # Pipeline de Calidad (GitHub Actions)
+├── infra/                  # Infraestructura como Código (Terraform)
+│   ├── .terraform/         # Binarios de proveedores (Ignorado en git)
+│   ├── compute.tf          # Definición de EC2 y Discos
+│   ├── iam.tf              # Permisos y Roles
+│   ├── install_docker.sh   # Script de automatización (User Data)
+│   ├── provider.tf         # Configuración AWS
+│   ├── storage.tf          # Definición de S3 (Data Lake)
+│   ├── variables.tf        # Variables de configuración
+│   └── terraform.tfstate   # Estado local (Ignorado en git)
+├── .gitignore              # Exclusiones
 └── README.md               # Esta documentación
 ```
-
------
-
-*Documentación generada para el Sprint 1 del Proyecto Final - Data Engineering.*
