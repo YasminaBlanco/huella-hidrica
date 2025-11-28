@@ -503,8 +503,7 @@ async def ingest_open_meteo(
                 buf = io.BytesIO()
                 partition_df.to_parquet(buf, index=False, compression="snappy")
 
-                file_key = f"{S3_BRONZE_PREFIX}/open_meteo/{
-                    country.value}/province={prov}/year={y}/month={m}/data.parquet"
+                file_key = f"{S3_BRONZE_PREFIX}/open_meteo/{country.value}/province={prov}/year={y}/month={m}/data.parquet"
 
                 s3_path = upload_to_s3(
                     buf.getvalue(),
