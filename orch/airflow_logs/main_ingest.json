@@ -1,0 +1,11 @@
+{
+  "logs": [
+    {
+      "timestamp": "2025-11-28T07:57:15.177987+00:00",
+      "task_id": "ingest_source3_daily",
+      "endpoint": "/ingest/open-meteo",
+      "status": "SUCCESS",
+      "message": "{\"status\":\"success\"}"
+    }
+  ]
+}{"timestamp": "2025-11-28T07:57:15.177987+00:00", "task_id": "ingest_source3_daily", "endpoint": "/ingest/open-meteo", "status": "SUCCESS", "message": "{\"status\":\"success\"}"}
