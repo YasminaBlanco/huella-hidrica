@@ -29,7 +29,7 @@ import silver_fact_socioeconomic
 # CONFIG GLOBAL DESDE ENV
 # ==========================
 
-BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica-pruebas")
+BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
 PROCESS_YEAR_ENV = os.getenv("PROCESS_YEAR")   # ej. "2020"

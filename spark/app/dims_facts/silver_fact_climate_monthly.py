@@ -38,7 +38,7 @@ from base_silver_model_job import (
 # ==========================
 
 # Bucket base 
-BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica-pruebas")
+BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
 # Datos de clima en Silver

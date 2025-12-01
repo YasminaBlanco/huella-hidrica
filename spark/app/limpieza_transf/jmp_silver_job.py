@@ -11,7 +11,7 @@ from pyspark.sql import DataFrame
 # CONFIGURACIÓN: bucket base y rutas en S3 para JMP
 # =====================================================
 
-BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica-pruebas")
+BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 
 BRONZE_JMP_PATH = f"s3a://{BASE_BUCKET}/bronze/jmp/country=*/year=*"
 SILVER_JMP_CLEAN_PATH = f"s3a://{BASE_BUCKET}/silver/jmp/"

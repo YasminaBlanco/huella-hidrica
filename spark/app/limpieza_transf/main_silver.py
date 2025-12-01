@@ -23,7 +23,7 @@ def main():
     # ======================================================
     # 1. CONFIGURACIÓN: bucket base y periodo a procesar
     # ======================================================
-    BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica-pruebas")
+    BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 
     bronze_root = f"s3a://{BASE_BUCKET}/bronze"
     silver_root = f"s3a://{BASE_BUCKET}/silver"
