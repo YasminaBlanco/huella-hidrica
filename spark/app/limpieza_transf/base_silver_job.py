@@ -69,4 +69,4 @@ def run_clean_etl(
 
     print("[STEP 5/5] Guardando dataset limpio en Silver...")
     write_clean_func(df_clean)
-    print("\n✅ ETL completado con éxito para este origen.")
+    print("\n ETL completado con éxito para este origen.")
