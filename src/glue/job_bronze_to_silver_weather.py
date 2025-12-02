@@ -1,4 +1,5 @@
 import sys
+
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.utils import getResolvedOptions
@@ -6,13 +7,7 @@ from pyspark.context import SparkContext
 from pyspark.sql.functions import col
 
 # Importamos tipos
-from pyspark.sql.types import (
-    DoubleType,
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-)
+from pyspark.sql.types import DoubleType, LongType, StringType, StructField, StructType
 
 args = getResolvedOptions(sys.argv, ["JOB_NAME"])
 sc = SparkContext()
