@@ -1,0 +1,15 @@
+[flake8]
+# Aceptamos líneas de hasta 127 caracteres (igual que en GitHub Actions)
+max-line-length = 127
+
+# Ignoramos E203 (espacios antes de dos puntos) porque entra en conflicto con Black
+extend-ignore = E203
+
+# Excluimos carpetas que no queremos revisar
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .venv,
+    venv

@@ -10,6 +10,7 @@ repos:
     rev: 5.12.0
     hooks:
       - id: isort
+        args: ["--profile", "black"]
 
   # 3. Flake8 (Errores de sintaxis)
   - repo: https://github.com/pycqa/flake8
