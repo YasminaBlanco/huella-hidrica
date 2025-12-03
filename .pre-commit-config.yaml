@@ -1,0 +1,18 @@
+repos:
+  # 1. Black (Formateo)
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+
+  # 2. Isort (Orden de imports)
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+
+  # 3. Flake8 (Errores de sintaxis)
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
