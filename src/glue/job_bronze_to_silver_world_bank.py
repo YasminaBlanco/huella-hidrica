@@ -63,8 +63,6 @@ df_final = df_spark.select(
 
 s3_target_path = "s3://henry-pf-g2-huella-hidrica/silver/world_bank_final/"
 
-df_final.write.mode("overwrite").option("compression", "snappy").partitionBy(
-    "year"
-).parquet(s3_target_path)
+df_final.write.mode("overwrite").option("compression", "snappy").partitionBy("year").parquet(s3_target_path)
 
 job.commit()

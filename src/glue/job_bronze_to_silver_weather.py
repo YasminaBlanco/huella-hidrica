@@ -32,11 +32,7 @@ weather_schema = StructType(
 s3_source_path = "s3://henry-pf-g2-huella-hidrica/bronze/open_meteo/"
 print(f"Leyendo Clima desde: {s3_source_path}")
 
-df_spark = (
-    spark.read.schema(weather_schema)
-    .option("recursiveFileLookup", "true")
-    .parquet(s3_source_path)
-)
+df_spark = spark.read.schema(weather_schema).option("recursiveFileLookup", "true").parquet(s3_source_path)
 
 # --- 3. LIMPIEZA Y CONVERSIÓN ---
 # Dividimos por 1000000 asumiendo microsegundos (estándar Parquet/Arrow) a segundos para Spark
@@ -54,8 +50,6 @@ s3_target_path = "s3://henry-pf-g2-huella-hidrica/silver/weather_final/"
 print(f"Escribiendo en: {s3_target_path}")
 
 # Esta línea es larga pero segura:
-df_final.write.mode("overwrite").option("compression", "snappy").partitionBy(
-    "province"
-).parquet(s3_target_path)
+df_final.write.mode("overwrite").option("compression", "snappy").partitionBy("province").parquet(s3_target_path)
 
 job.commit()

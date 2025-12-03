@@ -36,10 +36,7 @@ s3_source_path = "s3://henry-pf-g2-huella-hidrica/bronze/jmp/"
 print(f"Leyendo JMP (CSV) desde: {s3_source_path}")
 
 df_spark = (
-    spark.read.option("header", "true")
-    .option("recursiveFileLookup", "true")
-    .schema(jmp_schema)
-    .csv(s3_source_path)
+    spark.read.option("header", "true").option("recursiveFileLookup", "true").schema(jmp_schema).csv(s3_source_path)
 )  # <--- AQUÍ ESTÁ EL CAMBIO CLAVE
 
 # --- 3. LIMPIEZA Y NORMALIZACIÓN ---
@@ -59,8 +56,6 @@ df_final = df_spark.select(
 s3_target_path = "s3://henry-pf-g2-huella-hidrica/silver/jmp_final/"
 print(f"Escribiendo en: {s3_target_path}")
 
-df_final.write.mode("overwrite").option("compression", "snappy").partitionBy(
-    "year"
-).parquet(s3_target_path)
+df_final.write.mode("overwrite").option("compression", "snappy").partitionBy("year").parquet(s3_target_path)
 
 job.commit()
