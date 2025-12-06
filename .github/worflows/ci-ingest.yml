@@ -27,7 +27,7 @@ jobs:
           cache: "pip"
           cache-dependency-path: "ingest/requirements.txt"
 
-      - name: Install dependencies
+      - name: Install dependenciesss
         run: pip install -r requirements.txt pytest flake8 black bandit isort
 
       - name: Lint with flake8
