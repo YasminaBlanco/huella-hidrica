@@ -1,9 +1,7 @@
 name: CI - Ingest (FastAPI)
 
 on:
-  push:
-    paths:
-      - "ingest/**"
+  push
   pull_request:
     paths:
       - "ingest/**"
