@@ -2,11 +2,6 @@ name: CI Ingest (FastAPI)
 
 on:
   push:
-    paths:
-      - "ingest/**"
-  pull_request:
-    paths:
-      - "ingest/**"
 
 jobs:
   ci-ingest:
