@@ -2,6 +2,11 @@ name: CI Transform
 
 on:
   push:
+    paths:
+      - "transform/**" # chequear dsp
+  pull_request:
+    paths:
+      - "transform/**" # chequear dsp
 
 jobs:
   ci-ingest:
