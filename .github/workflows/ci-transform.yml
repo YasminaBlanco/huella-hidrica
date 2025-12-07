@@ -9,7 +9,7 @@ on:
       - "transform/**" # chequear dsp
 
 jobs:
-  ci-ingest:
+  ci-transform:
     runs-on: ubuntu-latest
 
     defaults:
