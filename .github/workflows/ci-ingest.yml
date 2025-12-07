@@ -40,5 +40,5 @@ jobs:
       # - name: Run unit tests
       #   run: pytest -q
 
-      # - name: Build Docker image
-      #   run: docker build -t ingest-ci .
+      - name: Build Docker image
+        run: docker build -t ingest-ci .
