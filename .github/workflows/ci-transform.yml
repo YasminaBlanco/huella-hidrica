@@ -1,0 +1,36 @@
+name: CI Transform
+
+on:
+  push:
+
+jobs:
+  ci-ingest:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: transform # chequear dsp
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: "transform/requirements.txt" # chequear dsp
+
+      - name: Install dependenciesss
+        run: pip install -r requirements.txt flake8 black bandit isort
+
+      - name: Lint with flake8
+        run: flake8 --max-line-length=120 .
+
+      - name: Check imports order with isort
+        run: isort --check-only .
+
+      - name: Check code format with black
+        run: black --check .
+
