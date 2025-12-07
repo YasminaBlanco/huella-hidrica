@@ -1,0 +1,32 @@
+name: Deploy Ingest
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "ingest/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: docker build -t ingest-app ./ingest
+
+      - name: Transfer image to EC2
+        run: |
+          docker save ingest-app | bzip2 | \
+          ssh -o StrictHostKeyChecking=no -i "${{ secrets.EC2_INGEST_KEY }}" ec2-user@${{ secrets.EC2_INGEST_IP }} \
+          'bunzip2 | docker load'
+
+      - name: Restart container
+        run: |
+          ssh -o StrictHostKeyChecking=no -i "${{ secrets.EC2_INGEST_KEY }}" ec2-user@${{ secrets.EC2_INGEST_IP }} \
+          'docker-compose -f /home/ec2-user/ingest/docker-compose.prod.yml up -d'
