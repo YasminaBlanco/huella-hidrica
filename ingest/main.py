@@ -13,10 +13,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 
 from utils.om import om_to_dataframe
-from utils.wb import (  # fetch_world_bank_page,
-    fetch_all_world_bank_data,
-    wb_sanitize,
-)
+from utils.wb import fetch_all_world_bank_data, wb_sanitize  # fetch_world_bank_page,
 
 LATAM_COUNTRIES = [
     "ARG",
@@ -128,9 +125,7 @@ WB_DEFAULT_INDICATORS = [
     "NY.GDP.PCAP.CD",  # PIB per cápita
     "SP.POP.TOTL",  # Población total
     "SH.STA.BASS.ZS",  # Acceso a saneamiento básico
-    "SH.H2O.BASW.ZS"  # Acceso a agua básica
-    "SI.POV.DDAY"
-    "SH.DYN.MORT",
+    "SH.H2O.BASW.ZS" "SI.POV.DDAY" "SH.DYN.MORT",  # Acceso a agua básica
 ]
 
 
@@ -187,7 +182,6 @@ def ingest_world_bank_data(
     end_year: int = Query(..., description="Año fin (YYYY)"),
     isTest: bool = Query(False, description="Test conexión"),
 ):
-
     if isTest:
         return {
             "status": "success",
@@ -291,7 +285,6 @@ def ingest_open_meteo_simple(
     timezone_utc: bool = Query(False, description="Timezone (por defecto UTC)"),
     isTest: bool = Query(False, description="Test conexión"),
 ):
-
     if isTest:
         return {
             "status": "success",
@@ -423,7 +416,6 @@ async def ingest_open_meteo(
     timezone_utc: bool = Query(False, description="Timezone (por defecto UTC)"),
     isTest: bool = Query(False, description="Test conexión"),
 ):
-
     if isTest:
         return {
             "status": "success",
@@ -499,7 +491,6 @@ def ingest_jmp_data(
     ),
     isTest: bool = Query(False, description="Test conexión"),
 ):
-
     if isTest:
         return {
             "status": "success",
