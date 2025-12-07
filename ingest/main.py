@@ -13,9 +13,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 
 from utils.om import om_to_dataframe
-from utils.wb import (
+from utils.wb import (  # fetch_world_bank_page,
     fetch_all_world_bank_data,
-    # fetch_world_bank_page,
     wb_sanitize,
 )
 
@@ -147,9 +146,7 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
-LatamCountry = Enum(
-    "LatamCountry", {country: country for country in LATAM_COUNTRIES}
-)
+LatamCountry = Enum("LatamCountry", {country: country for country in LATAM_COUNTRIES})
 
 app = FastAPI(
     title="API - Agua Latam",
@@ -167,9 +164,7 @@ except Exception as e:
     raise RuntimeError(f"No se pudo inicializar el cliente S3: {e}")
 
 
-def upload_to_s3(
-    data_bytes, key, content_type="application/octet-stream", metadata=None
-):
+def upload_to_s3(data_bytes, key, content_type="application/octet-stream", metadata=None):
     try:
         s3_client.put_object(
             Bucket=S3_BUCKET_NAME,
@@ -215,17 +210,13 @@ def ingest_world_bank_data(
     indicators_str = ";".join(indicator_list)
     date_range = f"{start_year}:{end_year}"
     endpoint = f"/country/{countries_str}/indicator/{indicators_str}"
-    query_params = urlencode(
-        {"date": date_range, "format": "json", "per_page": 20000, "source": 2}
-    )
+    query_params = urlencode({"date": date_range, "format": "json", "per_page": 20000, "source": 2})
     base_url = f"{BASE_WB_URL}{endpoint}?{query_params}"
 
     try:
         raw_data = fetch_all_world_bank_data(base_url)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error consultando WB: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error consultando WB: {e}")
 
     if not raw_data:
         raise HTTPException(status_code=404, detail="No se encontraron datos")
@@ -258,9 +249,7 @@ def ingest_world_bank_data(
             year_df = country_df[country_df["date"] == year]
 
             buf = io.BytesIO()
-            year_df.to_parquet(
-                buf, index=False, compression="snappy", engine="pyarrow"
-            )
+            year_df.to_parquet(buf, index=False, compression="snappy", engine="pyarrow")
             buf.seek(0)
 
             file_key = f"{S3_BRONZE_PREFIX}/world_bank/country={country}/year={year}/world_bank.parquet"
@@ -294,20 +283,12 @@ def ingest_world_bank_data(
 
 @app.get("/ingest/open-meteo-simple")
 def ingest_open_meteo_simple(
-    country: LatamCountry = Query(
-        ..., description="Código ISO3 del país LATAM"
-    ),
-    latitude: float = Query(
-        ..., ge=-90, le=90, description="Latitud (-90 a 90)"
-    ),
-    longitude: float = Query(
-        ..., ge=-180, le=180, description="Longitud (-180 a 180)"
-    ),
+    country: LatamCountry = Query(..., description="Código ISO3 del país LATAM"),
+    latitude: float = Query(..., ge=-90, le=90, description="Latitud (-90 a 90)"),
+    longitude: float = Query(..., ge=-180, le=180, description="Longitud (-180 a 180)"),
     start_date: date = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
     end_date: date = Query(..., description="Fecha fin (YYYY-MM-DD)"),
-    timezone_utc: bool = Query(
-        False, description="Timezone (por defecto UTC)"
-    ),
+    timezone_utc: bool = Query(False, description="Timezone (por defecto UTC)"),
     isTest: bool = Query(False, description="Test conexión"),
 ):
 
@@ -329,9 +310,7 @@ def ingest_open_meteo_simple(
         "end_date": end_date,
         "daily": "precipitation_sum,et0_fao_evapotranspiration",
         # "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration",
-        "timezone": (
-            "UTC" if timezone_utc else COUNTRY_TIMEZONE.get(country, "UTC")
-        ),
+        "timezone": ("UTC" if timezone_utc else COUNTRY_TIMEZONE.get(country, "UTC")),
     }
 
     country = country.value
@@ -394,9 +373,7 @@ def ingest_open_meteo_simple(
 semaphore = asyncio.Semaphore(5)
 
 
-async def fetch_province(
-    client, prov_name, lat, lon, start_date, end_date, timezone
-):
+async def fetch_province(client, prov_name, lat, lon, start_date, end_date, timezone):
     async with semaphore:
         params = {
             "latitude": lat,
@@ -431,9 +408,7 @@ def weather_response_to_dataframe(response: dict) -> pd.DataFrame:
                     "temperature_2m_max": daily["temperature_2m_max"][i],
                     "temperature_2m_min": daily["temperature_2m_min"][i],
                     "precipitation_sum": daily["precipitation_sum"][i],
-                    "et0_fao_evapotranspiration": daily[
-                        "et0_fao_evapotranspiration"
-                    ][i],
+                    "et0_fao_evapotranspiration": daily["et0_fao_evapotranspiration"][i],
                 }
             )
 
@@ -442,16 +417,10 @@ def weather_response_to_dataframe(response: dict) -> pd.DataFrame:
 
 @app.get("/ingest/open-meteo")
 async def ingest_open_meteo(
-    country: LatamCountry = Query(
-        ..., description="Código ISO3 del país LATAM"
-    ),
-    start_date: date = Query(
-        ..., description="Fecha inicio, formato YYYY-MM-DD"
-    ),
+    country: LatamCountry = Query(..., description="Código ISO3 del país LATAM"),
+    start_date: date = Query(..., description="Fecha inicio, formato YYYY-MM-DD"),
     end_date: date = Query(..., description="Fecha fin, formato YYYY-MM-DD"),
-    timezone_utc: bool = Query(
-        False, description="Timezone (por defecto UTC)"
-    ),
+    timezone_utc: bool = Query(False, description="Timezone (por defecto UTC)"),
     isTest: bool = Query(False, description="Test conexión"),
 ):
 
@@ -469,11 +438,7 @@ async def ingest_open_meteo(
                 info["longitude"],
                 start_date,
                 end_date,
-                (
-                    "UTC"
-                    if timezone_utc
-                    else COUNTRY_TIMEZONE.get(country, "UTC")
-                ),
+                ("UTC" if timezone_utc else COUNTRY_TIMEZONE.get(country, "UTC")),
             )
             for prov, info in COUNTRY_PROVINCES_MAPPING[country.value].items()
         ]
@@ -482,9 +447,7 @@ async def ingest_open_meteo(
     df = weather_response_to_dataframe({"data": dict(results)})
 
     if df.empty:
-        raise HTTPException(
-            status_code=404, detail="No se encontraron datos de Open-Meteo"
-        )
+        raise HTTPException(status_code=404, detail="No se encontraron datos de Open-Meteo")
 
     df["date"] = pd.to_datetime(df["date"])
     df["year"] = df["date"].dt.year
@@ -496,14 +459,14 @@ async def ingest_open_meteo(
         prov_df = df[df["province"] == prov]
         for y in prov_df["year"].unique():
             for m in prov_df[prov_df["year"] == y]["month"].unique():
-                partition_df = prov_df[
-                    (prov_df["year"] == y) & (prov_df["month"] == m)
-                ].copy()
+                partition_df = prov_df[(prov_df["year"] == y) & (prov_df["month"] == m)].copy()
 
                 buf = io.BytesIO()
                 partition_df.to_parquet(buf, index=False, compression="snappy")
 
-                file_key = f"{S3_BRONZE_PREFIX}/open_meteo/{country.value}/province={prov}/year={y}/month={m}/data.parquet"
+                file_key = (
+                    f"{S3_BRONZE_PREFIX}/open_meteo/{country.value}/province={prov}/year={y}/month={m}/data.parquet"
+                )
 
                 s3_path = upload_to_s3(
                     buf.getvalue(),
@@ -511,9 +474,7 @@ async def ingest_open_meteo(
                     content_type="application/octet-stream",
                     metadata={
                         "country": country.value,
-                        "province": prov.encode(
-                            "ascii", errors="ignore"
-                        ).decode(),
+                        "province": prov.encode("ascii", errors="ignore").decode(),
                         "source": "open-meteo",
                         "layer": "bronze",
                     },
@@ -545,9 +506,7 @@ def ingest_jmp_data(
         }
 
     if not os.path.exists(csv_path):
-        raise HTTPException(
-            status_code=404, detail=f"Archivo CSV no encontrado: {csv_path}"
-        )
+        raise HTTPException(status_code=404, detail=f"Archivo CSV no encontrado: {csv_path}")
 
     try:
         df = pd.read_csv(csv_path)
@@ -589,10 +548,7 @@ def ingest_jmp_data(
                 partition_df.to_parquet(buf, index=False, compression="snappy")
                 buf.seek(0)
 
-                file_key = (
-                    f"{S3_BRONZE_PREFIX}/jmp/"
-                    f"country={iso3}/year={int(year)}/jmp.parquet"
-                )
+                file_key = f"{S3_BRONZE_PREFIX}/jmp/" f"country={iso3}/year={int(year)}/jmp.parquet"
 
                 s3_path = upload_to_s3(
                     buf.getvalue(),
@@ -618,9 +574,7 @@ def ingest_jmp_data(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error procesando JMP: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error procesando JMP: {str(e)}")
 
 
 @app.get("/health", tags=["Health"])

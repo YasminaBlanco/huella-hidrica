@@ -22,9 +22,7 @@ def fetch_all_world_bank_data(base_url: str):
     first_page = fetch_world_bank_page(base_url, 1)
 
     if not isinstance(first_page, list) or len(first_page) < 2:
-        raise HTTPException(
-            status_code=500, detail="Respuesta inesperada del Banco Mundial"
-        )
+        raise HTTPException(status_code=500, detail="Respuesta inesperada del Banco Mundial")
 
     metadata = first_page[0]
     data = first_page[1]
