@@ -1,9 +1,11 @@
-import asyncio
+""" import asyncio
 import io
 import os
 from datetime import date, datetime, timezone
 from enum import Enum
 from urllib.parse import urlencode
+import json
+from decimal import Decimal
 
 import boto3
 import httpx
@@ -11,9 +13,11 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
+import redis
 
-from utils.om import om_to_dataframe
-from utils.wb import (
+from ingest.utils.om import om_to_dataframe
+from ingest.utils.wb import (
     fetch_all_world_bank_data,
     # fetch_world_bank_page,
     wb_sanitize,
@@ -147,8 +151,57 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
+
 LatamCountry = Enum(
     "LatamCountry", {country: country for country in LATAM_COUNTRIES}
+)
+
+def convert_decimals(obj):
+    if isinstance(obj, list):
+        return [convert_decimals(x) for x in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
+
+def list_gold_files():
+    response = s3_client.list_objects_v2(
+        Bucket=S3_BUCKET_NAME,
+        Prefix="gold/model/"
+    )
+
+    if "Contents" not in response:
+        return []
+
+    files = [
+        obj["Key"]
+        for obj in response["Contents"]
+        if obj["Key"].endswith(".parquet")
+    ]
+
+    # Retornar el nombre de archivo sin la ruta
+    file_names = [f.split("/")[-1] for f in files]
+    return file_names
+
+
+def read_parquet_from_s3(key: str) -> pd.DataFrame:
+    try:
+        obj = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+        raw_bytes = obj["Body"].read()
+        df = pd.read_parquet(io.BytesIO(raw_bytes))
+        return df
+    except s3_client.exceptions.NoSuchKey:
+        raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {key}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=0,
+    decode_responses=True, 
 )
 
 app = FastAPI(
@@ -379,7 +432,6 @@ def ingest_open_meteo_simple(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Ocurrió un error inesperado",
             detail=f"Error: {e}",
         )
 
@@ -633,3 +685,74 @@ def health_check():
         "version": os.getenv("API_VERSION", "1.0.0"),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def cache_get(key: str):
+    cached = redis_client.get(key)
+    if cached:
+        try:
+            return json.loads(cached)
+        except:
+            return cached
+    return None
+
+def cache_set(key: str, value, ttl_seconds: int):
+    redis_client.setex(key, ttl_seconds, json.dumps(convert_decimals(value)))
+
+
+@app.get("/gold/files")
+def get_gold_files():
+    cache_key = "gold_files"
+
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return {"files": cached, "cached": True}
+
+    files = list_gold_files()
+
+    cache_set(cache_key, files, ttl_seconds=300)
+
+    return {"files": files, "cached": False}
+
+
+@app.get("/gold/data")
+def get_gold_data(
+    kpi: str = Query(...),
+    limit: int = Query(None),
+):
+    
+    bucket_keys = {
+    "kpi4":"gold/model/kpi04_health_risk_population/part-00000-f9e797cf-15b2-481f-bd22-d5eb55a6a595-c000.snappy.parquet",
+    "kpi5":"gold/model/kpi05_urban_rural_gap_water/part-00000-aa37e629-ab2b-4d1c-867e-bf7258c709cb-c000.snappy.parquet",
+    "kpi6":"gold/model/kpi06_water_gdp_corr/part-00000-3b9acfb3-9e77-4aa5-a5ef-81b5bdf1a56c-c000.snappy.parquet",
+    "kpi7":"gold/model/kpi07_water_sanitation_gap/part-00000-7c893d94-aa92-429f-becf-bc608b29dced-c000.snappy.parquet",
+    }
+
+    print(bucket_keys[kpi])
+
+    key = f"{bucket_keys[kpi]}"
+
+    cache_key = f"gold_data:{kpi}:{limit}"
+
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return {"data": cached, "cached": True}
+
+    df = read_parquet_from_s3(key)
+
+    if limit:
+        df = df.head(limit)
+
+    data_json = df.to_dict(orient="records")
+    data_json = convert_decimals(data_json)
+    cache_set(cache_key, data_json, ttl_seconds=3600)
+
+    return {"data": data_json, "cached": False} """
+
+from fastapi import FastAPI
+from routers import kpi, ingest
+
+app = FastAPI(title="Huella Hídrica LATAM", version="1.0.0")
+
+app.include_router(ingest.router)
+app.include_router(kpi.router)
