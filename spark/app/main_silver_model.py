@@ -19,11 +19,13 @@ from typing import Optional
 
 from base_silver_model_job import create_spark_session
 
-import silver_dims_job
-import silver_fact_climate_monthly
-import silver_fact_climate_annual
-import silver_fact_wash_coverage_jmp
-import silver_fact_socioeconomic
+
+from silver.dims_facts import silver_dims_job
+from silver.dims_facts import silver_dims_job
+from silver.dims_facts import silver_fact_climate_monthly
+from silver.dims_facts import silver_fact_climate_annual
+from silver.dims_facts import silver_fact_wash_coverage_jmp
+from silver.dims_facts import silver_fact_socioeconomic
 
 # ==========================
 # CONFIG GLOBAL DESDE ENV

@@ -10,8 +10,8 @@ from pyspark.sql import functions as F
 from base_silver_job import create_spark_session, run_clean_etl
 
 # Importamos todas las funciones de Estrategia (Lectura, Estandarización, Limpieza, etc.)
-import etl_strategies as strategies
-import jmp_silver_job as jmp
+from silver.limpieza_transf import etl_strategies as strategies
+from silver.limpieza_transf import jmp_silver_job as jmp
 
 
 def main():
