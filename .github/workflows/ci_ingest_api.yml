@@ -3,7 +3,7 @@ name: CI Ingest-API
 on:
   push:
     branches:
-      - ingest
+      - e-api
 
 jobs:
   ci-transform:
