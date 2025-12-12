@@ -18,16 +18,6 @@ Estas vistas Gold son la **fuente principal de consulta** para:
 
 ---
 
----
-
-### Diagrama ER (Silver)
-
-> 📌 Actualiza la ruta del archivo.
-
-![ERD Gold](/docs/gold.jpg)
-
----
-
 ## Rol de la capa Gold en la arquitectura
 
 La capa Gold se construye a partir de tablas **Fact** limpias y estandarizadas y sus **Dimensiones** asociadas, generadas en la capa Silver. Entre las fuentes principales se incluyen:
@@ -98,24 +88,46 @@ KPI propuesto:
 
 | Columna                 | Tipo    | Descripción detallada                                                                                                   |
 |-------------------------|---------|-------------------------------------------------------------------------------------------------------------------------|
-| `country_key`          | INT     | Id interno del país (llave sustituta).                                                                                  |
-| `country_name`         | STRING  | Nombre del país (por ejemplo, `Mexico`, `Argentina`).                                                                   |
-| `residence_type_key`   | INT     | Id interno del tipo de residencia.                                                                     |
-| `residence_type_desc`  | STRING  | Tipo de área: normalmente `urban` o `rural`.                                                                            |
-| `year`                 | INT     | Año de la observación. **Nota**: solo aparecen años donde se puede comparar contra un año anterior (es decir, desde el segundo año disponible en la serie). |
-| `precip_total_mm_year` | DOUBLE  | Precipitación acumulada en el **año actual**, en milímetros, para ese país y tipo de área.                             |
-| `delta_precip_mm`      | DOUBLE  | **Cambio de precipitación respecto al año anterior**. Se calcula como:<br> `precip_total_mm_year (año actual) - precip_total_mm_year (año anterior)`. |
-| `safe_water_pct`       | DOUBLE  | % de población con **agua segura (drinking water, at least basic)** en el **año actual**, para ese país y tipo de área. |
-| `delta_safe_water_pp`  | DOUBLE  | **Cambio en la cobertura de agua segura respecto al año anterior**, en **puntos porcentuales**. Se calcula como:<br>`safe_water_pct (año actual) - safe_water_pct (año anterior)`. |
-| `start_year`           | INT     | Primer año que entra en el análisis de correlación para ese país y tipo de área. Corresponde al primer año en el que hay comparación contra un año anterior (es decir, cuando ya existe un delta válido). |
-| `end_year`             | INT     | Último año incluido en el análisis de correlación para ese país y tipo de área.                                         |
+| `country_key`           | INT     | Id interno del país (llave sustituta).                                                                                  |
+| `country_name`          | STRING  | Nombre del país (por ejemplo, `Mexico`, `Argentina`).                                                                   |
+| `residence_type_key`    | INT     | Id interno del tipo de residencia.                                                                                      |
+| `residence_type_desc`   | STRING  | Tipo de área: normalmente `urban` o `rural`.                                                                            |
+| `year`                  | INT     | Año de la observación. Solo aparecen años donde se puede comparar contra un año anterior.                              |
+| `precip_total_mm_year`  | DOUBLE  | Precipitación acumulada en el **año actual**, en milímetros, para ese país y tipo de área.                             |
+| `delta_precip_mm`       | DOUBLE  | Cambio de precipitación respecto al año anterior, en mm.                                                                |
+| `safe_water_pct`        | DOUBLE  | % de población con **agua segura** (drinking water, at least basic) en el año actual.                                  |
+| `delta_safe_water_pp`   | DOUBLE  | Cambio en la cobertura de agua segura respecto al año anterior, en **puntos porcentuales (p.p.)**.                     |
+| `corr_precip_vs_water`  | DOUBLE  | Correlación de Pearson entre `delta_precip_mm` y `delta_safe_water_pp` para ese país y tipo de área.                   |
+| `corr_abs_value`        | DOUBLE  | Valor absoluto de `corr_precip_vs_water`, usado para medir la **fuerza** de la relación independientemente del signo.  |
+| `risk_level`            | STRING  | Semáforo de riesgo basado en `corr_abs_value` (`green`, `yellow`, `red`, `gray`).                                      |
+| `impact_direction`      | STRING  | Dirección del impacto según el signo de la correlación: `direct`, `inverse` o `uncertain`.                             |
 | `years_observed`       | BIGINT  | Número de **observaciones de delta** usadas para la correlación. Equivale al número de años en los que se pudo calcular “año actual vs año anterior”. |
-| `corr_precip_vs_water` | DOUBLE  | Correlación de Pearson entre `delta_precip_mm` y `delta_safe_water_pp` para ese país y tipo de área, usando todos los años disponibles en el rango [`start_year`, `end_year`]. |
-| `corr_abs_value`       | DOUBLE  | Valor absoluto de `corr_precip_vs_water`, usado para medir la **fuerza** de la relación independientemente del signo.   |
-| `risk_level`           | STRING  | Semáforo de riesgo basado en `corr_abs_value`:<br>• `< 0.3` → `green` (relación débil)<br>• `0.3–0.6` → `yellow` (relación moderada)<br>• `≥ 0.6` → `red` (relación fuerte). Si la correlación es nula, se usa `gray`. |
-| `impact_direction`     | STRING  | Dirección del impacto según el **signo** de la correlación:<br>• `direct` si `corr_precip_vs_water ≥ 0.2` (cuando cambian las lluvias, cambia en el mismo sentido la cobertura de agua segura).<br>• `inverse` si `corr_precip_vs_water ≤ -0.2` (sequías asociadas a caída de cobertura, o al revés).<br>• `uncertain` si la correlación es muy baja o nula. |
+---
+
+#### ⚙️ Definición del KPI
+
+El indicador resume qué tan relacionados están los cambios en la precipitación
+con los cambios en la cobertura de agua segura, para cada país `c` y tipo de área `r`
+(urbano/rural).
+
+1.  **Cálculo de variaciones anuales:**  
+    Para cada país `c`, tipo de área `r` y año `t` se calculan las diferencias año contra año:
+
+    $$\Delta \text{Precip}(c,r,t) = \text{PrecipTotalMmYear}(c,r,t) - \text{PrecipTotalMmYear}(c,r,t-1)$$
+
+    $$\Delta \text{AguaSegura}(c,r,t) = \text{SafeWaterPct}(c,r,t) - \text{SafeWaterPct}(c,r,t-1)$$
+
+2.  **Cálculo de la correlación clima–agua:**  
+    A partir de los vectores de deltas se calcula la correlación de Pearson:
+
+    $$\text{corr\_precip\_vs\_water}(c,r) = \text{corr}_\text{Pearson}\big(\Delta \text{Precip}(c,r,\cdot), \Delta \text{AguaSegura}(c,r,\cdot)\big)$$
+
+    También se utiliza el valor absoluto de la correlación:
+
+    $$\text{corr\_abs\_value}(c,r) = \left|\text{corr\_precip\_vs\_water}(c,r)\right|$$
 
 
+ 
 #### 🚦 Lógica del semáforo
 
 El semáforo se basa en `corr_abs_value` (fuerza de la correlación):
@@ -163,21 +175,44 @@ Solo se incluyen filas para años donde **existe un año anterior** con el que c
 
 #### Columnas de `kpi02_water_mobility`
 
+
 | Columna                    | Tipo    | Descripción detallada                                                                                                    |
 |----------------------------|---------|--------------------------------------------------------------------------------------------------------------------------|
 | `country_key`             | INT     | Id interno del país (llave sustituta de la dimensión país).                                                              |
 | `country_name`            | STRING  | Nombre del país (por ejemplo, `Mexico`, `Argentina`, etc.).                                                              |
-| `residence_type_key`      | INT     | Id interno del tipo de residencia.                                  |
+| `residence_type_key`      | INT     | Id interno del tipo de residencia.                                                                                       |
 | `residence_type_desc`     | STRING  | Descripción del tipo de área: `urban` o `rural`.                                                                         |
 | `year`                    | INT     | Año de la observación. Es el **año actual** en la comparación contra el año anterior.                                    |
-| `pct_over_30min`          | DOUBLE  | Porcentaje de población cuya fuente principal de **agua potable (drinking water)** está a **más de 30 minutos** de distancia. Corresponde al nivel de servicio **limited service (>30 min)**. |
-| `delta_pct_over_30min_pp` | DOUBLE  | **Cambio año contra año anterior** de `pct_over_30min`, en **puntos porcentuales**. Se calcula como:<br>`pct_over_30min (año actual) - pct_over_30min (año anterior)`. |
-| `mobility_trend`          | STRING  | Tendencia de la movilidad forzada entre el año actual y el año anterior, según `delta_pct_over_30min_pp`:<br>• `worsened`: si el delta es **mayor a +0.5 p.p.** → aumenta el % de personas que tarda >30 min (empeora).<br>• `improved`: si el delta es **menor a -0.5 p.p.** → disminuye ese %, mejora la situación.<br>• `stable`: si el cambio está entre -0.5 y +0.5 p.p. (variación pequeña). |
-| `start_year`              | INT     | Primer año disponible en la serie para ese país + tipo de residencia (usado como inicio del periodo de análisis).        |
-| `end_year`                | INT     | Último año disponible en la serie para ese país + tipo de residencia.                                                    |
-| `years_observed`          | BIGINT  | Número total de años **con datos** para ese país + tipo de residencia (cuenta de años distintos en la serie).            |
-| `risk_level`              | STRING  | Semáforo de riesgo basado en el nivel actual de `pct_over_30min`:<br>• `gray`: sin datos (`pct_over_30min` nulo).<br>• `green`: `pct_over_30min` ≤ 5%.<br>• `yellow`: 5% < `pct_over_30min` ≤ 20%.<br>• `red`: `pct_over_30min` > 20%. |
+| `pct_over_30min`          | DOUBLE  | % de población cuya fuente principal de agua potable está a **más de 30 minutos** de distancia (servicio limitado).     |
+| `delta_pct_over_30min_pp` | DOUBLE  | Cambio año contra año anterior de `pct_over_30min`, en **puntos porcentuales (p.p.)**.                                   |
+| `mobility_trend`          | STRING  | Tendencia de la movilidad forzada (`worsened`, `improved`, `stable`).                                                    |
+| `risk_level`              | STRING  | Semáforo de riesgo basado en el nivel actual de `pct_over_30min`.                                                       |
 
+---
+#### ⚙️ Definición del KPI
+
+El indicador cuantifica qué porcentaje de la población tarda más de 30 minutos
+en llegar a su fuente principal de agua y cómo cambia esa situación a lo largo del tiempo,
+para cada país `c`, tipo de área `r` (urbano/rural) y año `t`.
+
+1.  **Cálculo del porcentaje de población con tiempo > 30 minutos:**  
+    Para cada combinación `(c, r, t)`:
+
+    $$
+    \text{PctOver30min}(c,r,t) =
+    100 \times
+    \frac{\text{Población con tiempo > 30 min}}{\text{Población total con datos}}
+    $$
+
+2.  **Variación año contra año y tendencia de movilidad:**  
+    Se calcula el cambio en puntos porcentuales respecto al año anterior:
+
+    $$
+    \Delta \text{PctOver30min\_pp}(c,r,t) =
+    \text{PctOver30min}(c,r,t) - \text{PctOver30min}(c,r,t-1)
+    $$
+
+  
 #### 🚦 Lógica del semáforo
 
 Basado en `pct_over_30min`:
@@ -231,24 +266,59 @@ Es decir, describe la situación **por provincia y año**, e incluye además el 
 
 | Columna                 | Tipo    | Descripción detallada                                                                                           |
 |-------------------------|---------|-----------------------------------------------------------------------------------------------------------------|
-| `country_key`          | INT     | Id interno del país (llave sustituta de la dimensión país).                                                     |
-| `country_name`         | STRING  | Nombre del país (por ejemplo, `Mexico`, `Argentina`).                                                           |
-| `province_key`         | INT     | Id interno de la provincia/estado (dimensión `province`).                                                       |
-| `province_name`        | STRING  | Nombre de la provincia/estado.                                                                                  |
-| `year`                 | INT     | Año de referencia. Corresponde al año en el que se agregan las métricas de clima y saneamiento.                |
-| `sanitation_basic_pct` | DOUBLE  | **Porcentaje de población con al menos saneamiento básico** en el país y año. Se calcula como `100 - pct_bad_sanitation`, donde `pct_bad_sanitation` suma los niveles de servicio considerados “malos” (`service_level_key` en `[1 (unimproved), 2(open defecation), 4(limited service)]`). Sólo se usa residencia urbana. |
-| `is_low_sanitation`    | BOOLEAN | Indica si la cobertura de saneamiento básico es **baja**. Es `TRUE` cuando `sanitation_basic_pct` es **< 80%**. |
-| `precip_total_mm_year` | DOUBLE  | Precipitación anual acumulada en milímetros para esa provincia y año. Se obtiene sumando la precipitación mensual a partir de la tabla de clima. |
-| `climate_trend`        | STRING  | Tendencia de la precipitación en esa provincia, calculada usando todos los años disponibles:<br>• `decreasing`: la lluvia muestra una tendencia descendente (correlación año–precipitación ≤ -0.3).<br>• `increasing`: la lluvia muestra tendencia creciente (correlación ≥ +0.3).<br>• `stable`: no hay cambio claro (correlación entre -0.3 y +0.3).<br>• `uncertain`: hay menos de 3 años de datos, por lo que no se puede estimar bien la tendencia. |
-| `is_climate_neg_trend` | BOOLEAN | Es `TRUE` cuando `climate_trend = 'decreasing'`, es decir, cuando la provincia muestra **tendencia a menos lluvia** (sequía creciente). |
-| `is_critical_zone`     | BOOLEAN | Marca si la provincia/año es una **zona crítica**. Es `TRUE` cuando se cumplen **ambas** condiciones:<br>1) `is_low_sanitation = TRUE` (baja cobertura de saneamiento), y<br>2) `is_climate_neg_trend = TRUE` (tendencia climática negativa). |
-| `critical_zones_count` | INT     | Número total de zonas críticas en el **país y año**. |
-| `risk_level`           | STRING  | Semáforo de riesgo a nivel país/año, basado en `critical_zones_count`:<br>• `green`: `critical_zones_count` ≤ 5.<br>• `yellow`: 6–20 zonas críticas.<br>• `red`: > 20 zonas críticas. |
-| `start_year`           | INT     | Primer año con datos disponibles para esa provincia (se usa para mostrar el periodo de observación).           |
-| `end_year`             | INT     | Último año con datos disponibles para esa provincia.                                                            |
-| `years_observed`       | INT     | Número de años distintos con datos de clima/saneamiento observados para esa provincia.                         |
+| `country_key`           | INT     | Id interno del país (llave sustituta de la dimensión país).                                                     |
+| `country_name`          | STRING  | Nombre del país (por ejemplo, `Mexico`, `Argentina`).                                                           |
+| `province_key`          | INT     | Id interno de la provincia/estado (dimensión `province`).                                                       |
+| `province_name`         | STRING  | Nombre de la provincia/estado.                                                                                  |
+| `year`                  | INT     | Año de referencia.                                                                                              |
+| `sanitation_basic_pct`  | DOUBLE  | % de población con al menos saneamiento básico en la provincia/año (residencia urbana).                         |
+| `is_low_sanitation`     | BOOLEAN | `TRUE` si la cobertura de saneamiento básico es baja (`sanitation_basic_pct < 80`).                             |
+| `precip_total_mm_year`  | DOUBLE  | Precipitación anual acumulada en milímetros para esa provincia y año.                                          |
+| `climate_trend`         | STRING  | Tendencia de la precipitación: `decreasing`, `increasing`, `stable` o `uncertain`.                              |
+| `is_climate_neg_trend`  | BOOLEAN | `TRUE` cuando la provincia muestra tendencia a menos lluvia (`climate_trend = 'decreasing'`).                   |
+| `is_critical_zone`      | BOOLEAN | `TRUE` cuando se combinan baja cobertura de saneamiento y tendencia climática negativa.                         |                       |
 
 ---
+#### ⚙️ Definición del KPI
+
+El indicador identifica provincias/estados donde coinciden **baja cobertura de saneamiento**
+y una **tendencia climática de disminución de lluvias**, y resume cuántas “zonas críticas”
+hay por país `c` y año `t`.
+
+1.  **Saneamiento básico y bandera de baja cobertura:**  
+    A partir de los niveles de servicio de saneamiento se calcula el porcentaje con
+    al menos saneamiento básico en cada país `c`, provincia `p` y año `t`:
+
+    $$
+    \text{SanitationBasicPct}(c,p,t) =
+    100 - \big(
+      \text{PctUnimproved}(c,p,t) +
+      \text{PctOpenDefecation}(c,p,t) +
+      \text{PctLimitedService}(c,p,t)
+    \big)
+    $$
+
+    Se marca la provincia con **saneamiento bajo** si:
+
+    $$
+    \text{is\_low\_sanitation}(c,p,t) =
+    \begin{cases}
+    1 & \text{si } \text{SanitationBasicPct}(c,p,t) < 80 \\
+    0 & \text{en otro caso}
+    \end{cases}
+    $$
+
+2.  **Tendencia climática por provincia:**  
+    Se calcula primero la precipitación anual agregada y la correlación entre año y precipitación:
+
+    $$
+    \text{corr\_year\_precip}(c,p) =
+    \text{corr}_\text{Pearson}
+    \big(
+      \text{Year},
+      \text{PrecipTotalMmYear}(c,p,\text{Year})
+    \big)
+    $$
 
 #### 🚦 Lógica del semáforo
 
