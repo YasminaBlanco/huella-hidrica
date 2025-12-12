@@ -27,7 +27,7 @@ jobs:
         run: flake8 --max-line-length=124 .
 
       - name: Check imports order with isort
-        run: isort --check-only .
+        run: isort --profile black --check-only .
 
       - name: Check code format with black
         run: black --check .

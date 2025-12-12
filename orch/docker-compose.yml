@@ -22,8 +22,8 @@ services:
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflowsecret
+      AIRFLOW__CORE__FERNET_KEY: ''
     entrypoint: |
       bash -c '
         echo "[INIT] Inicializando Airflow DB..." &&
@@ -47,14 +47,14 @@ services:
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflowsecret
+      AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__SMTP__SMTP_HOST: smtp.mailgun.org
       AIRFLOW__SMTP__SMTP_STARTTLS: "true"
       AIRFLOW__SMTP__SMTP_SSL: "false"
       AIRFLOW__SMTP__SMTP_PORT: 587
-      AIRFLOW__SMTP__SMTP_USER: ${MAILGUN_SMTP_USER}
-      AIRFLOW__SMTP__SMTP_PASSWORD: ${MAILGUN_SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_USER: "postmaster@sandbox4ed83056ba13482382a9000ad56cead7.mailgun.org"
+      AIRFLOW__SMTP__SMTP_PASSWORD: ""
       AIRFLOW__SMTP__SMTP_MAIL_FROM: "dept01@sandbox4ed83056ba13482382a9000ad56cead7.mailgun.org"
     ports:
       - "8081:8080"
@@ -63,6 +63,7 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./airflow_logs:/opt/airflow/logs
+      - ./airflow_ssh:/opt/airflow/.ssh 
 
   airflow-scheduler:
     image: airflow-custom:2.9.2-python3.10
@@ -71,20 +72,21 @@ services:
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflowsecret
+      AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__SMTP__SMTP_HOST: smtp.mailgun.org
       AIRFLOW__SMTP__SMTP_STARTTLS: "true"
       AIRFLOW__SMTP__SMTP_SSL: "false"
       AIRFLOW__SMTP__SMTP_PORT: 587
-      AIRFLOW__SMTP__SMTP_USER: ""
+      AIRFLOW__SMTP__SMTP_USER: "postmaster@sandbox4ed83056ba13482382a9000ad56cead7.mailgun.org"
       AIRFLOW__SMTP__SMTP_PASSWORD: ""
-      AIRFLOW__SMTP__SMTP_MAIL_FROM: ""
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: "dept01@sandbox4ed83056ba13482382a9000ad56cead7.mailgun.org"
     command: scheduler
     restart: always
     volumes:
       - ./dags:/opt/airflow/dags
-      - ./airflow_logs:/opt/airflow/logs
+      - ./airflow_logs:/opt/airflow/logs 
+      - ./airflow_ssh:/opt/airflow/.ssh
 
 volumes:
   airflow-db:
