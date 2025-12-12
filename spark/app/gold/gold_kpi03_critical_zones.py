@@ -4,8 +4,9 @@
 #
 
 
-from pyspark.sql import functions as F
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
 from base_gold_model_job import BaseGoldKPIJob
 
 
