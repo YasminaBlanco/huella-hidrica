@@ -1,0 +1,25 @@
+name: Deploy Transform
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "spark/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: docker build -t transform-app ./spark
+
+      - name: Run PySpark container
+        run: docker run -d transform-app
+        
