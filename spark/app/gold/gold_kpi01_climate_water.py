@@ -2,10 +2,10 @@
 #
 # Correlación Clima vs Acceso al Agua (MEX/ARG).
 
-from base_gold_model_job import BaseGoldKPIJob
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark.sql import DataFrame
+from base_gold_model_job import BaseGoldKPIJob
 
 
 class GoldKPI01ClimateWater(BaseGoldKPIJob):
@@ -24,9 +24,9 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
 
     # Filtros de negocio
     COUNTRIES_ISO3_FILTER = ["MEX", "ARG"]
-    SAFE_SERVICE_TYPE_KEYS = [2]  # drinking water
-    SAFE_SERVICE_LEVEL_KEYS = [5]  # at least basic
-    RESIDENCE_TYPE_KEYS = [1, 2]  # urban, rural
+    SAFE_SERVICE_TYPE_KEYS = [2]        # drinking water
+    SAFE_SERVICE_LEVEL_KEYS = [5]       # at least basic
+    RESIDENCE_TYPE_KEYS = [1, 2]        # urban, rural
 
     def __init__(self, spark, silver_model_base_path, gold_model_base_path):
         super().__init__(spark, silver_model_base_path, gold_model_base_path)
@@ -56,15 +56,12 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         self.log("Leyendo y preparando dimensiones para Broadcast...")
 
         country_df = self.read_silver_table(self.COUNTRY_TABLE).select(
-            "country_key",
-            "country_iso3",
-            "country_name",
+            "country_key", "country_iso3", "country_name"
         )
         B_country_df = F.broadcast(country_df)
 
         res_type_df = self.read_silver_table(self.RES_TYPE_TABLE).select(
-            "residence_type_key",
-            "residence_type_desc",
+            "residence_type_key", "residence_type_desc"
         )
         B_res_type_df = F.broadcast(res_type_df)
 
@@ -74,9 +71,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         self.log("Leyendo hechos de clima anual y cobertura WASH...")
 
         climate_raw = self.read_silver_table(self.CLIMATE_TABLE).select(
-            "country_key",
-            "date_key",
-            "precip_total_mm_year",
+            "country_key", "date_key", "precip_total_mm_year"
         )
         wash_raw = self.read_silver_table(self.WASH_TABLE).select(
             "country_key",
@@ -99,63 +94,37 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         # ===============================================
         # 3) Filtrar WASH a agua segura + enriquecer dims
         # ===============================================
-        self.log(
-            "Aplicando filtros de agua segura y usando Broadcast para enriquecimiento..."
-        )
+        self.log("Aplicando filtros de agua segura y zonas urbanas/rurales...")
 
         wash_enriched = (
             wash_with_year
-            # USO DE BROADCAST: Join con dimensiones pequeñas
-            .join(B_country_df, on="country_key", how="left").join(
-                B_res_type_df, on="residence_type_key", how="left"
-            )
+            .join(B_country_df, on="country_key", how="left")
+            .join(B_res_type_df, on="residence_type_key", how="left")
         )
 
         wash_safe = (
-            wash_enriched.filter(F.col("country_iso3").isin(self.COUNTRIES_ISO3_FILTER))
+            wash_enriched
+            .filter(F.col("country_iso3").isin(self.COUNTRIES_ISO3_FILTER))
             .filter(F.col("service_type_key").isin(self.SAFE_SERVICE_TYPE_KEYS))
             .filter(F.col("service_level_key").isin(self.SAFE_SERVICE_LEVEL_KEYS))
             .filter(F.col("residence_type_key").isin(self.RESIDENCE_TYPE_KEYS))
         )
 
-        safe_count = wash_safe.count()
-        if safe_count == 0:
-            self.log("No se encontraron filas de agua segura. Devolviendo DF vacío.")
-            # Definición del esquema para retorno seguro (omitiendo por brevedad)
-            schema = (
-                "country_key INT, country_name STRING, "
-                "residence_type_key INT, residence_type_desc STRING, "
-                "year INT, "
-                "precip_total_mm_year DOUBLE, delta_precip_mm DOUBLE, "
-                "safe_water_pct DOUBLE, delta_safe_water_pp DOUBLE, "
-                "start_year INT, end_year INT, years_observed BIGINT, "
-                "corr_precip_vs_water DOUBLE, corr_abs_value DOUBLE, "
-                "risk_level STRING, impact_direction STRING"
+        # Agregar por país + tipo de residencia + año:
+        # % de población con agua segura (nivel al menos básico)
+        self.log("Agregando porcentaje de agua segura por país/zona/año...")
+
+        wash_safe_yearly = (
+            wash_safe.groupBy(
+                "country_key",
+                "country_iso3",
+                "country_name",
+                "residence_type_key",
+                "residence_type_desc",
+                "year",
             )
-            return self.spark.createDataFrame([], schema)
-
-        # Agregamos por país + tipo de residencia + año
-        wash_safe_yearly = wash_safe.groupBy(
-            "country_key",
-            "country_iso3",
-            "country_name",
-            "residence_type_key",
-            "residence_type_desc",
-            "year",
-        ).agg(F.max("coverage_pct").alias("safe_water_pct"))
-
-        # ======================================================
-        # 4) Rango dinámico de años basado solo en wash_coverage
-        # ======================================================
-        self.log("Calculando rango dinámico de años desde wash_coverage filtrado...")
-
-        stats = wash_safe_yearly.agg(
-            F.min("year").alias("min_year"), F.max("year").alias("max_year")
-        ).collect()[0]
-        min_year = stats["min_year"]
-        max_year = stats["max_year"]
-
-        self.log(f"Rango de años detectado: {min_year} - {max_year}")
+            .agg(F.max("coverage_pct").alias("safe_water_pct"))
+        )
 
         # ============================
         # 4) Preparar clima anual MEX/ARG
@@ -166,17 +135,14 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
             climate_with_year
             .join(B_country_df, on="country_key", how="left")
             .filter(F.col("country_iso3").isin(self.COUNTRIES_ISO3_FILTER))
-            .filter(
-                (F.col("year") >= F.lit(min_year)) & (F.col("year") <= F.lit(max_year))
-            )
             .select(
                 "country_key",
                 "country_iso3",
                 "country_name",
                 "year",
-                F.col("precip_total_mm_year")
-                .cast("double")
-                .alias("precip_total_mm_year"),
+                F.col("precip_total_mm_year").cast("double").alias(
+                    "precip_total_mm_year"
+                ),
             )
         )
 
@@ -185,24 +151,34 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         # ============================
         self.log("Uniendo clima anual con agua segura por (country, year)...")
 
-        series_df = climate_for_countries.join(
-            wash_safe_yearly,
-            on=["country_key", "country_iso3", "country_name", "year"],
-            how="inner",
-        ).select(
-            "country_key",
-            "country_name",
-            "country_iso3",
-            "residence_type_key",
-            "residence_type_desc",
-            "year",
-            "precip_total_mm_year",
-            "safe_water_pct",
+        series_df = (
+            climate_for_countries.join(
+                wash_safe_yearly,
+                on=[
+                    "country_key",
+                    "country_iso3",
+                    "country_name",
+                    "year",
+                ],
+                how="inner",
+            )
+            .select(
+                "country_key",
+                "country_name",
+                "country_iso3",
+                "residence_type_key",
+                "residence_type_desc",
+                "year",
+                "precip_total_mm_year",
+                "safe_water_pct",
+            )
         )
 
+        # Si no hay datos combinados, devolvemos DF vacío con el esquema final
         if series_df.rdd.isEmpty():
             self.log(
-                "Después de unir clima anual con agua segura, no quedaron filas. Devolviendo DataFrame vacío."
+                "Después de unir clima anual con agua segura, no quedaron filas. "
+                "Devolviendo DataFrame vacío."
             )
             schema = (
                 "country_key INT, country_name STRING, "
@@ -210,7 +186,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
                 "year INT, "
                 "precip_total_mm_year DOUBLE, delta_precip_mm DOUBLE, "
                 "safe_water_pct DOUBLE, delta_safe_water_pp DOUBLE, "
-                "start_year INT, end_year INT, years_observed BIGINT, "
+                "years_observed BIGINT, "
                 "corr_precip_vs_water DOUBLE, corr_abs_value DOUBLE, "
                 "risk_level STRING, impact_direction STRING"
             )
@@ -229,15 +205,21 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         ).orderBy("year")
 
         deltas = (
-            series_df.withColumn("prev_precip", F.lag("precip_total_mm_year").over(w))
+            series_df
+            .withColumn("prev_precip", F.lag("precip_total_mm_year").over(w))
             .withColumn("prev_safe", F.lag("safe_water_pct").over(w))
             .withColumn(
-                "delta_precip_mm", F.col("precip_total_mm_year") - F.col("prev_precip")
+                "delta_precip_mm",
+                F.col("precip_total_mm_year") - F.col("prev_precip"),
             )
             .withColumn(
-                "delta_safe_water_pp", F.col("safe_water_pct") - F.col("prev_safe")
+                "delta_safe_water_pp",
+                F.col("safe_water_pct") - F.col("prev_safe"),
             )
-            .filter(F.col("prev_precip").isNotNull() & F.col("prev_safe").isNotNull())
+            .filter(
+                F.col("prev_precip").isNotNull()
+                & F.col("prev_safe").isNotNull()
+            )
         )
 
         # ==========================================
@@ -252,34 +234,37 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
             "residence_type_desc",
         ]
 
-        agg_corr = deltas.groupBy(group_cols).agg(
-            F.count("*").alias("years_observed"),
-            F.min("year").alias("start_year"),
-            F.max("year").alias("end_year"),
-            F.corr("delta_precip_mm", "delta_safe_water_pp").alias(
-                "corr_precip_vs_water"
-            ),
+        agg_corr = (
+            deltas.groupBy(group_cols)
+            .agg(
+                F.count("*").alias("years_observed"),
+                F.corr("delta_precip_mm", "delta_safe_water_pp").alias(
+                    "corr_precip_vs_water"
+                ),
+            )
         )
 
-        # Lógica de Semáforo y Dirección
         agg_corr = agg_corr.withColumn(
             "corr_abs_value", F.abs(F.col("corr_precip_vs_water"))
         )
-        agg_corr = agg_corr.withColumn(
-            "risk_level",
-            F.when(F.col("corr_precip_vs_water").isNull(), F.lit("gray"))
-            .when(F.col("corr_abs_value") < 0.3, F.lit("green"))
-            .when(F.col("corr_abs_value") < 0.6, F.lit("yellow"))
-            .otherwise(F.lit("red")),
-        ).withColumn(
-            "impact_direction",
-            F.when(F.col("corr_precip_vs_water").isNull(), F.lit("uncertain"))
-            .when(F.col("corr_precip_vs_water") >= 0.2, F.lit("direct"))
-            .when(F.col("corr_precip_vs_water") <= -0.2, F.lit("inverse"))
-            .otherwise(F.lit("uncertain")),
+
+        agg_corr = (
+            agg_corr.withColumn(
+                "risk_level",
+                F.when(F.col("corr_precip_vs_water").isNull(), F.lit("gray"))
+                .when(F.col("corr_abs_value") < 0.3, F.lit("green"))
+                .when(F.col("corr_abs_value") < 0.6, F.lit("yellow"))
+                .otherwise(F.lit("red")),
+            )
+            .withColumn(
+                "impact_direction",
+                F.when(F.col("corr_precip_vs_water").isNull(), F.lit("uncertain"))
+                .when(F.col("corr_precip_vs_water") >= 0.2, F.lit("direct"))
+                .when(F.col("corr_precip_vs_water") <= -0.2, F.lit("inverse"))
+                .otherwise(F.lit("uncertain")),
+            )
         )
 
-        # PREPARACIÓN BROADCAST
         B_agg_corr = F.broadcast(agg_corr)
 
         # ==========================================
@@ -290,9 +275,8 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         )
 
         final_df = (
-            deltas
-            # USO DE BROADCAST: Join de series con el DF de correlación
-            .join(B_agg_corr, on=group_cols, how="left").select(
+            deltas.join(B_agg_corr, on=group_cols, how="left")
+            .select(
                 "country_key",
                 "country_name",
                 "residence_type_key",
@@ -302,8 +286,6 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
                 "delta_precip_mm",
                 "safe_water_pct",
                 "delta_safe_water_pp",
-                "start_year",
-                "end_year",
                 "years_observed",
                 "corr_precip_vs_water",
                 "corr_abs_value",

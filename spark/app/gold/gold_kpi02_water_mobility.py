@@ -5,17 +5,18 @@
 # por país, zona (urban/rural) y año.
 
 
-from base_gold_model_job import BaseGoldKPIJob
-from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark.sql import DataFrame
+
+from base_gold_model_job import BaseGoldKPIJob
 
 
 class GoldKPI02WaterMobility(BaseGoldKPIJob):
     """
     KPI 02 - Movilidad forzada para conseguir agua.
 
-    Métrica principal: porcentaje de población que tarda más de 30 minutos
+    Métrica principal: porcentaje de población que tarda más de 30 minutos 
     en llegar a su fuente principal de agua, y su evolución anual.
     """
 
@@ -27,9 +28,9 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
     # Filtros de negocio
     LATAM_ISO3 = []  # [] => todos los países con datos
 
-    DRINKING_WATER_KEY = 2  # service_type_key = 2 -> drinking water
-    LIMITED_SERVICE_KEY = 4  # service_level_key = 4 -> limited service (>30 min)
-    RESIDENCE_TYPE_KEYS = [1, 2]  # 1 = urban, 2 = rural
+    DRINKING_WATER_KEY = 2          # service_type_key = 2 -> drinking water
+    LIMITED_SERVICE_KEY = 4         # service_level_key = 4 -> limited service (>30 min)
+    RESIDENCE_TYPE_KEYS = [1, 2]    # 1 = urban, 2 = rural
 
     # Umbral para considerar que la tendencia empeora o mejora en puntos porcentuales
     UMBRAL_TENDENCIA_PP = 0.5
@@ -71,10 +72,8 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         # Dimensión País 
         country_df = self.read_silver_table(self.COUNTRY_TABLE).select(
             "country_key",
-            "country_iso3",
             "country_name",
         )
-        # PREPARACIÓN BROADCAST: Dimensión País
         B_country_df = F.broadcast(country_df)
 
         # Dimensión Tipo de residencia
@@ -82,7 +81,6 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             "residence_type_key",
             "residence_type_desc",
         )
-        # PREPARACIÓN BROADCAST: Dimensión Residencia
         B_res_type_df = F.broadcast(res_type_df)
 
         # -----------------------------
@@ -111,30 +109,16 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         # 3) Filtrar a 'más de 30 minutos' (limited service)
         # -------------------------------------------------
         self.log(
-            "Filtrando registros de 'drinking water' + 'limited service' (>30 min)..."
+            "Filtrando registros de 'drinking water' + 'limited service' (>30 min) "
+            "y zonas urbana / rural..."
         )
 
         wash_limited = (
-            wash_enriched.filter(F.col("service_type_key") == self.DRINKING_WATER_KEY)
+            wash_enriched
+            .filter(F.col("service_type_key") == self.DRINKING_WATER_KEY)
             .filter(F.col("service_level_key") == self.LIMITED_SERVICE_KEY)
             .filter(F.col("residence_type_key").isin(self.RESIDENCE_TYPE_KEYS))
         )
-
-        count_limited = wash_limited.count()
-        if count_limited == 0:
-            self.log(
-                "No se encontraron filas con los filtros configurados. Devolviendo DF vacío."
-            )
-            schema = (
-                "country_key INT, country_name STRING, "
-                "residence_type_key INT, residence_type_desc STRING, "
-                "year INT, "
-                "pct_over_30min DOUBLE, delta_pct_over_30min_pp DOUBLE, "
-                "mobility_trend STRING, "
-                "start_year INT, end_year INT, years_observed BIGINT, "
-                "risk_level STRING"
-            )
-            return self.spark.createDataFrame([], schema)
 
         # --------------------------------------------------------
         # 4) Agregar por país + residencia + año: % población >30
@@ -143,35 +127,23 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             "Agregando porcentaje de población cuya fuente principal está a más de 30 minutos..."
         )
 
-        pct_yearly = wash_limited.groupBy(
-            "country_key",
-            "country_iso3",
-            "country_name",
-            "residence_type_key",
-            "residence_type_desc",
-            "year",
-        ).agg(F.max("coverage_pct").alias("pct_over_30min"))
-
-        if pct_yearly.rdd.isEmpty():
-            self.log(
-                "Después de la agregación por año no quedaron filas. Devolviendo DataFrame vacío."
+        pct_yearly = (
+            wash_limited
+            .groupBy(
+                "country_key",
+                "country_name",
+                "residence_type_key",
+                "residence_type_desc",
+                "year",
             )
-            schema = (
-                "country_key INT, country_name STRING, "
-                "residence_type_key INT, residence_type_desc STRING, "
-                "year INT, "
-                "pct_over_30min DOUBLE, delta_pct_over_30min_pp DOUBLE, "
-                "mobility_trend STRING, "
-                "start_year INT, end_year INT, years_observed BIGINT, "
-                "risk_level STRING"
-            )
-            return self.spark.createDataFrame([], schema)
+            .agg(F.max("coverage_pct").alias("pct_over_30min"))
+        )
 
         # -------------------------------------------------
         # 5) Calcular evolución anual (delta en p.p.) + tendencia
         # -------------------------------------------------
         self.log(
-            "Calculando evolución anual (delta_pct_over_30min_pp) y tendencia (Window function)..."
+            "Calculando evolución anual (delta_pct_over_30min_pp) y tendencia..."
         )
 
         w = Window.partitionBy(
@@ -182,14 +154,17 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         ).orderBy("year")
 
         pct_with_delta = (
-            pct_yearly.withColumn("prev_pct", F.lag("pct_over_30min").over(w))
+            pct_yearly
+            .withColumn("prev_pct", F.lag("pct_over_30min").over(w))
             .withColumn(
-                "delta_pct_over_30min_pp", F.col("pct_over_30min") - F.col("prev_pct")
+                "delta_pct_over_30min_pp",
+                F.col("pct_over_30min") - F.col("prev_pct"),
             )
             .withColumn(
                 "mobility_trend",
                 F.when(
-                    F.col("delta_pct_over_30min_pp").isNull(), F.lit("no_previous_year")
+                    F.col("delta_pct_over_30min_pp").isNull(),
+                    F.lit("no_previous_year"),
                 )
                 .when(
                     F.col("delta_pct_over_30min_pp") > self.UMBRAL_TENDENCIA_PP,
@@ -200,45 +175,6 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
                     F.lit("improved"),
                 )
                 .otherwise(F.lit("stable")),
-            )
-        )
-
-        # -------------------------------------------------
-        # 7) Stats de años observados por país + residencia
-        # -------------------------------------------------
-        self.log("Calculando start_year, end_year y years_observed por grupo...")
-
-        group_cols = [
-            "country_key",
-            "country_name",
-            "residence_type_key",
-            "residence_type_desc",
-        ]
-
-        stats_df = pct_yearly.groupBy(group_cols).agg(
-            F.countDistinct("year").alias("years_available"),
-            F.min("year").alias("start_year"),
-            F.max("year").alias("end_year"),
-        )
-        # PREPARACIÓN BROADCAST: Stats agregadas (muy pequeñas)
-        B_stats_df = F.broadcast(stats_df)
-
-        # -------------------------------------------------
-        # 8) Semáforo por nivel de % población >30 min
-        # -------------------------------------------------
-        self.log(
-            "Uniendo stats y asignando semáforo según % de población >30 minutos..."
-        )
-
-        pct_with_sem = (
-            pct_with_delta
-            # USO DE BROADCAST
-            .join(B_stats_df, on=group_cols, how="left").withColumn(
-                "risk_level",
-                F.when(F.col("pct_over_30min").isNull(), F.lit("gray"))
-                .when(F.col("pct_over_30min") <= 5, F.lit("green"))
-                .when(F.col("pct_over_30min") <= 20, F.lit("yellow"))
-                .otherwise(F.lit("red")),
             )
         )
 
@@ -274,9 +210,6 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             "pct_over_30min",
             "delta_pct_over_30min_pp",
             "mobility_trend",
-            "start_year",
-            "end_year",
-            "years_observed",  # Contiene el total de años disponibles para el grupo (país/residencia)
             "risk_level",
         )
 
