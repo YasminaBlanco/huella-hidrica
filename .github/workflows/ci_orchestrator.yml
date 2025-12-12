@@ -1,30 +1,35 @@
-name: CI Ochestrator
+name: CI Orchestrator
 
-push:
-  branches:
-    - orch
+on:
+  push:
+    branches:
+      - orch
 
 jobs:
   ci-transform:
     runs-on: ubuntu-latest
 
-  defaults:
-    run:
-      working-directory: orch
+    defaults:
+      run:
+        working-directory: orch
 
-  steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-    - name: Set up python
-      uses: actions/setup-python@v4
-    - name: Install dependenciesss
-      run: pip install flake8 black bandit isort
-    - name: Check imports order with isort
-      run: isort --profile black --check-only .
-    
-    - name: Check code format with black
-      run: black --check .
-    
-    - name: Lint with flake8
-      run: flake8 --max-line-length=124 .
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install flake8 black bandit isort
+
+      - name: Check imports order with isort
+        run: isort --profile black --check-only .
+
+      - name: Check code format with black
+        run: black --check .
+
+      - name: Lint with flake8
+        run: flake8 --max-line-length=124 .
