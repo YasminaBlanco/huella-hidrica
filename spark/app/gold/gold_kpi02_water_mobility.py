@@ -9,11 +9,12 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+
 class GoldKPI02WaterMobility(BaseGoldKPIJob):
     """
     KPI 02 - Movilidad forzada para conseguir agua.
 
-    Métrica principal: porcentaje de población que tarda más de 30 minutos 
+    Métrica principal: porcentaje de población que tarda más de 30 minutos
     en llegar a su fuente principal de agua, y su evolución anual.
     """
 
@@ -25,9 +26,9 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
     # Filtros de negocio
     LATAM_ISO3 = []  # [] => todos los países con datos
 
-    DRINKING_WATER_KEY = 2          # service_type_key = 2 -> drinking water
-    LIMITED_SERVICE_KEY = 4         # service_level_key = 4 -> limited service (>30 min)
-    RESIDENCE_TYPE_KEYS = [1, 2]    # 1 = urban, 2 = rural
+    DRINKING_WATER_KEY = 2  # service_type_key = 2 -> drinking water
+    LIMITED_SERVICE_KEY = 4  # service_level_key = 4 -> limited service (>30 min)
+    RESIDENCE_TYPE_KEYS = [1, 2]  # 1 = urban, 2 = rural
 
     # Umbral para considerar que la tendencia empeora o mejora en puntos porcentuales
     UMBRAL_TENDENCIA_PP = 0.5
@@ -66,7 +67,7 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             F.col("coverage_pct").cast("double").alias("coverage_pct"),
         )
 
-        # Dimensión País 
+        # Dimensión País
         country_df = self.read_silver_table(self.COUNTRY_TABLE).select(
             "country_key",
             "country_name",
@@ -96,11 +97,9 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             "Uniendo wash_coverage con dim_country y dim_residence_type usando Broadcast..."
         )
 
-        wash_enriched = (
-            wash_with_year
-            .join(B_country_df, on="country_key", how="left")
-            .join(B_res_type_df, on="residence_type_key", how="left")
-        )
+        wash_enriched = wash_with_year.join(
+            B_country_df, on="country_key", how="left"
+        ).join(B_res_type_df, on="residence_type_key", how="left")
 
         # -------------------------------------------------
         # 3) Filtrar a 'más de 30 minutos' (limited service)
@@ -111,8 +110,7 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         )
 
         wash_limited = (
-            wash_enriched
-            .filter(F.col("service_type_key") == self.DRINKING_WATER_KEY)
+            wash_enriched.filter(F.col("service_type_key") == self.DRINKING_WATER_KEY)
             .filter(F.col("service_level_key") == self.LIMITED_SERVICE_KEY)
             .filter(F.col("residence_type_key").isin(self.RESIDENCE_TYPE_KEYS))
         )
@@ -124,24 +122,18 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
             "Agregando porcentaje de población cuya fuente principal está a más de 30 minutos..."
         )
 
-        pct_yearly = (
-            wash_limited
-            .groupBy(
-                "country_key",
-                "country_name",
-                "residence_type_key",
-                "residence_type_desc",
-                "year",
-            )
-            .agg(F.max("coverage_pct").alias("pct_over_30min"))
-        )
+        pct_yearly = wash_limited.groupBy(
+            "country_key",
+            "country_name",
+            "residence_type_key",
+            "residence_type_desc",
+            "year",
+        ).agg(F.max("coverage_pct").alias("pct_over_30min"))
 
         # -------------------------------------------------
         # 5) Calcular evolución anual (delta en p.p.) + tendencia
         # -------------------------------------------------
-        self.log(
-            "Calculando evolución anual (delta_pct_over_30min_pp) y tendencia..."
-        )
+        self.log("Calculando evolución anual (delta_pct_over_30min_pp) y tendencia...")
 
         w = Window.partitionBy(
             "country_key",
@@ -151,8 +143,7 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         ).orderBy("year")
 
         pct_with_delta = (
-            pct_yearly
-            .withColumn("prev_pct", F.lag("pct_over_30min").over(w))
+            pct_yearly.withColumn("prev_pct", F.lag("pct_over_30min").over(w))
             .withColumn(
                 "delta_pct_over_30min_pp",
                 F.col("pct_over_30min") - F.col("prev_pct"),
@@ -191,12 +182,10 @@ class GoldKPI02WaterMobility(BaseGoldKPIJob):
         # -------------------------------------------------
         # 7) Filtrar filas sin delta (primer año de cada grupo)
         # -------------------------------------------------
-        pct_filtered = pct_with_sem.filter(
-            F.col("delta_pct_over_30min_pp").isNotNull()
-        )
+        pct_filtered = pct_with_sem.filter(F.col("delta_pct_over_30min_pp").isNotNull())
 
         # -------------------------------------------------
-        # 8) Seleccionar columnas finales 
+        # 8) Seleccionar columnas finales
         # -------------------------------------------------
         final_df = pct_filtered.select(
             "country_key",

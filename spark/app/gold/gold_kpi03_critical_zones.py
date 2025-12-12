@@ -7,6 +7,7 @@ from base_gold_model_job import BaseGoldKPIJob
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+
 class GoldKPI03CriticalZones(BaseGoldKPIJob):
     """
     KPI 03 - Zonas críticas para inversión (clima + saneamiento, México y Argentina)
@@ -46,7 +47,7 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
 
     def __init__(self, spark, silver_model_base_path, gold_model_base_path):
         super().__init__(spark, silver_model_base_path, gold_model_base_path)
-        
+
         self.spark.conf.set("spark.sql.shuffle.partitions", "16")
 
     # ------------------------------------------------------------------
@@ -151,9 +152,7 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
             .agg(
                 F.sum(
                     F.when(
-                        F.col("service_level_key").isin(
-                            self.SANITATION_BAD_LEVEL_KEYS
-                        ),
+                        F.col("service_level_key").isin(self.SANITATION_BAD_LEVEL_KEYS),
                         F.col("coverage_pct"),
                     ).otherwise(F.lit(0.0))
                 ).alias("pct_bad_sanitation")
@@ -232,12 +231,10 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
             )
         )
 
-        climate_with_year = (
-            climate_raw.withColumn("year", self._year_from_date_key("date_key"))
-            .filter(
-                (F.col("year") >= F.lit(min_year))
-                & (F.col("year") <= F.lit(max_year))
-            )
+        climate_with_year = climate_raw.withColumn(
+            "year", self._year_from_date_key("date_key")
+        ).filter(
+            (F.col("year") >= F.lit(min_year)) & (F.col("year") <= F.lit(max_year))
         )
 
         climate_enriched = climate_with_year.join(
@@ -246,18 +243,15 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
 
         self.log("Agregando clima anual (suma de precipitación mensual).")
 
-        climate_yearly = (
-            climate_enriched.groupBy(
-                "country_key",
-                "country_name",
-                "country_iso3",
-                self.PROVINCE_KEY_COL,
-                self.PROVINCE_NAME_COL,
-                "year",
-            )
-            .agg(
-                F.sum("precip_total_mm").alias("precip_total_mm_year"),
-            )
+        climate_yearly = climate_enriched.groupBy(
+            "country_key",
+            "country_name",
+            "country_iso3",
+            self.PROVINCE_KEY_COL,
+            self.PROVINCE_NAME_COL,
+            "year",
+        ).agg(
+            F.sum("precip_total_mm").alias("precip_total_mm_year"),
         )
 
         # =====================================================
@@ -284,13 +278,11 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
                     F.lit("uncertain"),
                 )
                 .when(
-                    F.col("corr_year_precip")
-                    <= self.CLIMATE_DECREASING_CORR_THRESHOLD,
+                    F.col("corr_year_precip") <= self.CLIMATE_DECREASING_CORR_THRESHOLD,
                     F.lit("decreasing"),
                 )
                 .when(
-                    F.col("corr_year_precip")
-                    >= self.CLIMATE_INCREASING_CORR_THRESHOLD,
+                    F.col("corr_year_precip") >= self.CLIMATE_INCREASING_CORR_THRESHOLD,
                     F.lit("increasing"),
                 )
                 .otherwise(F.lit("stable")),
@@ -316,27 +308,22 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
         # =====================================================
         # 4) Combinar clima (provincia/año) + saneamiento (país/año)
         # =====================================================
-        self.log(
-            "Combinando clima por provincia/año con saneamiento por país/año..."
-        )
+        self.log("Combinando clima por provincia/año con saneamiento por país/año...")
 
-        zones = (
-            climate_yearly.join(
-                B_climate_trend_stats,
-                on=[
-                    "country_key",
-                    "country_name",
-                    "country_iso3",
-                    self.PROVINCE_KEY_COL,
-                    self.PROVINCE_NAME_COL,
-                ],
-                how="left",
-            )
-            .join(
-                B_sanitation_yearly,
-                on=["country_key", "country_name", "country_iso3", "year"],
-                how="left",
-            )
+        zones = climate_yearly.join(
+            B_climate_trend_stats,
+            on=[
+                "country_key",
+                "country_name",
+                "country_iso3",
+                self.PROVINCE_KEY_COL,
+                self.PROVINCE_NAME_COL,
+            ],
+            how="left",
+        ).join(
+            B_sanitation_yearly,
+            on=["country_key", "country_name", "country_iso3", "year"],
+            how="left",
         )
 
         zones_complete = zones.filter(F.col("sanitation_basic_pct").isNotNull())
