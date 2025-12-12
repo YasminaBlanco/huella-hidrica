@@ -5,16 +5,17 @@
 #   - World Bank (indicadores socioeconómicos)
 
 
+from functools import reduce
+
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     DoubleType,
     IntegerType,
     StringType,
-    StructType,
     StructField,
+    StructType,
 )
-from functools import reduce
 
 # ==============================================================================
 # ESTRATEGIA: LECTURA UNIFICADA (Bronze -> Silver)
@@ -135,9 +136,7 @@ def read_data(spark: SparkSession, source_type: str, base_path: str) -> DataFram
 
             # 2. FILTRADO CRÍTICO: Limpieza final de NULLs en las columnas de partición
             initial_count = df.count()
-            df = df.filter(
-                F.col("year").isNotNull() & F.col("month").isNotNull()
-            )
+            df = df.filter(F.col("year").isNotNull() & F.col("month").isNotNull())
 
             filtered_count = df.count()
             if filtered_count < initial_count:
@@ -196,10 +195,8 @@ def read_data(spark: SparkSession, source_type: str, base_path: str) -> DataFram
             f"solo columnas esenciales: {wb_cols_to_read}"
         )
 
-        return (
-            spark.read
-            .option("recursiveFileLookup", "true")
-            .load(base_path, columns=wb_cols_to_read)
+        return spark.read.option("recursiveFileLookup", "true").load(
+            base_path, columns=wb_cols_to_read
         )
 
     else:
@@ -268,14 +265,10 @@ def transform_data(df: DataFrame) -> DataFrame:
     # Clima
     if "precipitation_sum" in cols and "et0_fao_evapotranspiration" in cols:
         # Aseguramos no nulos en las métricas de acumulado
-        df = df.na.fill(
-            0.0, subset=["precipitation_sum", "et0_fao_evapotranspiration"]
-        )
+        df = df.na.fill(0.0, subset=["precipitation_sum", "et0_fao_evapotranspiration"])
 
         # Agregación mensual: nivel (country, province, year, month)
-        df_monthly = df.groupBy(
-            "country_iso3", "province_name", "year", "month"
-        ).agg(
+        df_monthly = df.groupBy("country_iso3", "province_name", "year", "month").agg(
             F.round(F.sum("precipitation_sum"), 2).alias("precip_total_mm"),
             F.round(F.avg("temperature_2m_max"), 2).alias("temp_max_avg_c"),
             F.round(F.avg("temperature_2m_min"), 2).alias("temp_min_avg_c"),
@@ -284,10 +277,9 @@ def transform_data(df: DataFrame) -> DataFrame:
         )
 
         # Flags climáticos por dia
-        return (
-            df_monthly.withColumn("dry_day_flag", F.col("precip_total_mm") < 10)
-            .withColumn("heavy_rain_day_flag", F.col("precip_total_mm") > 150)
-        )
+        return df_monthly.withColumn(
+            "dry_day_flag", F.col("precip_total_mm") < 10
+        ).withColumn("heavy_rain_day_flag", F.col("precip_total_mm") > 150)
 
     # Socioeconómico
     elif "indicator_code" in cols and "indicator_value" in cols:
@@ -326,7 +318,9 @@ def write_data(df: DataFrame, output_path: str):
         group1_countries = ["ARG", "MEX"]
         df_group1 = df.filter(F.col("country_iso3").isin(group1_countries))
 
-        print("[INFO] Open Meteo: Escritura particionada por country_iso3, year, month.")
+        print(
+            "[INFO] Open Meteo: Escritura particionada por country_iso3, year, month."
+        )
 
         if not df_group1.isEmpty():
             print(
@@ -343,11 +337,7 @@ def write_data(df: DataFrame, output_path: str):
             print("[WARNING] GRP 1 (ARG/MEX) vacío. No se escribe nada para clima.")
 
     # 2. World Bank (Socioeconómico) - partición por country_iso3, year
-    elif (
-        "indicator_code" in cols
-        and "country_iso3" in cols
-        and "year" in cols
-    ):
+    elif "indicator_code" in cols and "country_iso3" in cols and "year" in cols:
         print(
             "[INFO] World Bank: overwrite dinámico por country_iso3, year en path:",
             output_path,
