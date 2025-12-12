@@ -4,13 +4,10 @@
 # % de población cuya fuente principal de agua está a más de 30 minutos,
 # por país, zona (urban/rural) y año.
 
-
+from base_gold_model_job import BaseGoldKPIJob
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-
-from base_gold_model_job import BaseGoldKPIJob
-
 
 class GoldKPI02WaterMobility(BaseGoldKPIJob):
     """
