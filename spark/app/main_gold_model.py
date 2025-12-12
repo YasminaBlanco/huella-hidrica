@@ -13,10 +13,15 @@ import os
 from typing import List
 
 from base_gold_model_job import create_spark_session
-from gold import (gold_kpi01_climate_water, gold_kpi02_water_mobility,
-                  gold_kpi03_critical_zones, gold_kpi04_health_risk_population,
-                  gold_kpi05_urban_rural_gap_water, gold_kpi06_water_gdp_corr,
-                  gold_kpi07_water_sanitation_gap)
+from gold import (
+    gold_kpi01_climate_water,
+    gold_kpi02_water_mobility,
+    gold_kpi03_critical_zones,
+    gold_kpi04_health_risk_population,
+    gold_kpi05_urban_rural_gap_water,
+    gold_kpi06_water_gdp_corr,
+    gold_kpi07_water_sanitation_gap,
+)
 from pyspark.sql import SparkSession
 
 # ==========================
