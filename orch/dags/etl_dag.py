@@ -364,14 +364,10 @@ with DAG(
     # T
 
     transform_gate = ShortCircuitOperator(
-        task_id="transform_gate",
-        python_callable=can_run_transformations
+        task_id="transform_gate", python_callable=can_run_transformations
     )
 
-    start_ec2_task = PythonOperator(
-        task_id="start_ec2",
-        python_callable=start_ec2
-    )
+    start_ec2_task = PythonOperator(task_id="start_ec2", python_callable=start_ec2)
 
     ssh_hook = SSHHook(ssh_conn_id="ssh_spark_ec2", timeout=3600)
 
@@ -414,10 +410,7 @@ with DAG(
 
         run_test_task >> run_silver_task >> run_silver_model_task >> run_gold_task
 
-    stop_ec2_task = PythonOperator(
-        task_id="stop_ec2",
-        python_callable=stop_ec2
-    )
+    stop_ec2_task = PythonOperator(task_id="stop_ec2", python_callable=stop_ec2)
 
     notify_transform_success = EmailOperator(
         task_id="notify_transform_success",
