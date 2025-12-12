@@ -120,11 +120,11 @@ con los cambios en la cobertura de agua segura, para cada país `c` y tipo de á
 2.  **Cálculo de la correlación clima–agua:**  
     A partir de los vectores de deltas se calcula la correlación de Pearson:
 
-    $$\text{corr\_precip\_vs\_water}(c,r) = \text{corr}_\text{Pearson}\big(\Delta \text{Precip}(c,r,\cdot), \Delta \text{AguaSegura}(c,r,\cdot)\big)$$
+    $$\text{CorrPrecipVsWater}(c,r) = \text{Corr}\text{Pearson}\big(\Delta \text{Precip}(c,r,\cdot), \Delta \text{AguaSegura}(c,r,\cdot)\big)$$
 
     También se utiliza el valor absoluto de la correlación:
 
-    $$\text{corr\_abs\_value}(c,r) = \left|\text{corr\_precip\_vs\_water}(c,r)\right|$$
+    $$\text{CorrAbsValue}(c,r) = \left|\text{CorrPrecipVsWater}(c,r)\right|$$
 
 
  
