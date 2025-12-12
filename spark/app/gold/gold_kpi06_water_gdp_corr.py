@@ -79,6 +79,8 @@ class GoldKPI06(BaseGoldKPIJob):
                 .limit(20)
                 .collect()
             ]
+            print("unique_service_levels", unique_service_levels.count())
+            print("unique_service_types", unique_service_types.count())
         # ---------------------------------------
 
         # Agregación total país/año
@@ -121,6 +123,7 @@ class GoldKPI06(BaseGoldKPIJob):
                 .limit(20)
                 .collect()
             ]
+            print("unique_indicators", unique_indicators.count())
         # ---------------------------------------
 
         # Aseguramos el casting de la columna valor para cálculos
@@ -151,7 +154,16 @@ class GoldKPI06(BaseGoldKPIJob):
             # Si no hay datos, devolvemos un DataFrame vacío
             return self.spark.createDataFrame(
                 [],
-                "region_name: string, year: int, n_countries: int, corr_water_vs_gdp: decimal(6,3), corr_abs_value: decimal(6,3), avg_safe_water_pct: decimal(5,2), avg_gdp_per_capita: decimal(18,2), risk_level: string",
+                (
+                    "region_name: string, "
+                    "year: int, "
+                    "n_countries: int, "
+                    "corr_water_vs_gdp: decimal(6,3), "
+                    "corr_abs_value: decimal(6,3), "
+                    "avg_safe_water_pct: decimal(5,2), "
+                    "avg_gdp_per_capita: decimal(18,2), "
+                    "risk_level: string"
+                ),
             )
 
         # 3. Unir con dim_country para obtener la región

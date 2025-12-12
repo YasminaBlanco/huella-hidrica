@@ -30,12 +30,12 @@ def main():
     # Rutas de Lectura (Bronze)
     BASE_BRONZE_METEO = f"{bronze_root}/open_meteo/"
     BASE_BRONZE_WB = f"{bronze_root}/world_bank/"
-    BASE_BRONZE_JMP = f"{bronze_root}/jmp/country=*/year=*"
+    # BASE_BRONZE_JMP = f"{bronze_root}/jmp/country=*/year=*"
 
     # Rutas de Escritura (Silver)
     OUTPUT_SILVER_CLIMATE = f"{silver_root}/climate_monthly/"
     OUTPUT_SILVER_SOCIO = f"{silver_root}/socioeconomic/"
-    OUTPUT_SILVER_JMP = f"{silver_root}/jmp/"
+    # OUTPUT_SILVER_JMP = f"{silver_root}/jmp/"
 
     # Periodo a procesar para runs incrementales
     process_year_env = os.getenv("PROCESS_YEAR")  # ej. "2024"

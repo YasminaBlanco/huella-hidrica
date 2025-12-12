@@ -91,7 +91,15 @@ class GoldKPI07(BaseGoldKPIJob):
             )
             return self.spark.createDataFrame(
                 [],
-                "country_key: int, country_name: string, year: int, water_basic_safe_pct: decimal(5,2), sanitation_basic_safe_pct: decimal(5,2), gap_water_sanitation_pp: decimal(6,3), risk_level: string",
+                (
+                    "country_key: int, "
+                    "country_name: string, "
+                    "year: int, "
+                    "water_basic_safe_pct: decimal(5,2), "
+                    "sanitation_basic_safe_pct: decimal(5,2), "
+                    "gap_water_sanitation_pp: decimal(6,3), "
+                    "risk_level: string"
+                ),
             )
 
         # 4. Calcular la brecha (Gap) en puntos porcentuales (p.p.)
