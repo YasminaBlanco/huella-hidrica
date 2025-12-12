@@ -24,7 +24,7 @@ jobs:
         run: pip install flake8 black bandit isort
 
       - name: Check imports order with isort
-        run: isort --check-only .
+        run: isort --profile black --check-only .
       
       - name: Check code format with black
         run: black --check .
