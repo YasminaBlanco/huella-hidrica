@@ -11,7 +11,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: transformation # chequear dsp
+        working-directory: spark 
 
     steps:
       - name: Checkout repo
