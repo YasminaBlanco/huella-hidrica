@@ -11,7 +11,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: transform # chequear dsp
+        working-directory: transformation # chequear dsp
 
     steps:
       - name: Checkout repo
