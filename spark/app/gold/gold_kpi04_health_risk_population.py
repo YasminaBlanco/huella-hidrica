@@ -1,8 +1,7 @@
-from pyspark.sql import SparkSession, DataFrame
+from base_gold_model_job import BaseGoldKPIJob
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from base_gold_model_job import BaseGoldKPIJob
-
 
 # Indicadores de WDI (ejemplo, verificar códigos correctos en dim_indicator)
 WDI_INDICATORS = {

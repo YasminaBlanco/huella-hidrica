@@ -2,9 +2,9 @@
 #
 # Zonas Críticas (Clima + Saneamiento) para México y Argentina.
 
-from pyspark.sql import functions as F
-from pyspark.sql import DataFrame
 from base_gold_model_job import BaseGoldKPIJob
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 
 class GoldKPI03CriticalZones(BaseGoldKPIJob):

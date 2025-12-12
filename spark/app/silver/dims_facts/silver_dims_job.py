@@ -20,13 +20,11 @@ Este job NO crea facts; solo dimensiones, y siempre hace FULL REFRESH.
 """
 
 import os
-from pyspark.sql import SparkSession, DataFrame, functions as F
 
-from base_silver_model_job import (
-    DFMap,
-    run_silver_model_job,
-    create_spark_session,
-)
+from base_silver_model_job import (DFMap, create_spark_session,
+                                   run_silver_model_job)
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 # ============================================================================
 # 1. CONFIGURACIÓN DE RUTAS (CONTROLADAS POR BASE_BUCKET)

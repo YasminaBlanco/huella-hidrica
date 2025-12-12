@@ -3,9 +3,10 @@
 # Job de limpieza para la fuente JMP (Wash Coverage)
 
 import os
-from pyspark.sql import functions as F, types as T
-from pyspark.sql import DataFrame
 
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 # =====================================================
 # CONFIGURACIÓN: bucket base y rutas en S3 para JMP

@@ -13,8 +13,7 @@ Patrones de diseño aplicados:
       - output_path()
 """
 
-from pyspark.sql import SparkSession, DataFrame
-
+from pyspark.sql import DataFrame, SparkSession
 
 # ============================================================
 # 0. SparkSession para la capa GOLD

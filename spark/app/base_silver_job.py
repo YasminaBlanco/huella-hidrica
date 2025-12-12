@@ -5,9 +5,9 @@ Patrones de diseño aplicados: Template Method y Strategy.
 Define el flujo general (read -> standardize -> data quality -> clean -> write).
 """
 
-from pyspark.sql import SparkSession
-from pyspark.sql import DataFrame
-from typing import Callable, Any
+from typing import Any, Callable
+
+from pyspark.sql import DataFrame, SparkSession
 
 # Alias para simplificar las firmas de función
 DFProcessor = Callable[[DataFrame], DataFrame]

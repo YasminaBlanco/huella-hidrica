@@ -1,6 +1,6 @@
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
 from base_gold_model_job import BaseGoldKPIJob
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 # Claves de la dimensión WASH (ACTUALIZADAS con el último mapeo de residencia)
 

@@ -18,8 +18,9 @@ Soporta dos modos de ejecución según el contexto:
   - Incremental
 """
 
-from typing import Callable, Dict, Any, Optional
-from pyspark.sql import SparkSession, DataFrame
+from typing import Any, Callable, Dict, Optional
+
+from pyspark.sql import DataFrame, SparkSession
 
 # Alias para mapear nombres de tablas
 DFMap = Dict[str, DataFrame]

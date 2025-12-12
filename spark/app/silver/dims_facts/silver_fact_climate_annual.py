@@ -35,13 +35,11 @@ Soporta dos modos:
 import os
 from typing import Optional
 
-from pyspark.sql import SparkSession, DataFrame, functions as F, types as T
-
-from base_silver_model_job import (
-    DFMap,
-    run_silver_model_job,
-    create_spark_session,
-)
+from base_silver_model_job import (DFMap, create_spark_session,
+                                   run_silver_model_job)
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 # ==========================
 # CONFIG: BUCKET Y RANGOS
