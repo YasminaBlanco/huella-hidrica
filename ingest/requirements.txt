@@ -1,0 +1,12 @@
+boto3
+fastapi
+fastparquet
+httpx
+numpy
+pandas
+pyarrow
+python-dotenv
+redis
+requests
+uvicorn[standard]
+pytest-asyncio
