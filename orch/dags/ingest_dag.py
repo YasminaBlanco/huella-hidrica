@@ -23,7 +23,7 @@ PYSPARK_PRIVATE_IP = "172.31.11.188"
 AWS_REGION = "us-east-2"
 SSH_KEY_PATH = "/opt/airflow/.ssh/spark-ap.pem"
 BASE_BUCKET = "henry-pf-g2-huella-hidrica"
-EMAIL_TO = "c4devx@gmail.com"
+EMAIL_TO = ""
 
 # Flags para transformaciones
 UNIQUE_INGEST_FLAG = "ingest_unique_done"
