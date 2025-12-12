@@ -109,7 +109,7 @@ Para entornos distribuidos, la carpeta correspondiente debe copiarse a su respec
 
 Para una comprensión profunda de la lógica de cada componente, por favor, consulte los `README.md` individuales:
 
-* **[Infraestructura (Terraform) »](terraform/README.md)**: Estructura de la infraestructura.
+* **[Infraestructura (Terraform) »](Infraestructura/readme.md)**: Estructura de la infraestructura.
 * **[Ingesta (FastAPI) »](ingest/readme.md)**: Detalle sobre la extracción de datos de las APIs de World Bank y Open-Meteo y la carga a la capa Bronze.
 * **[(Spark) »](spark/readme.md)**: Como levantar el contenedor de Spark, ejecutar los scripts de ETL y visualizar los resultados.
 * **[Silver»](spark/app/silver/readme.md)**: Estructura de la capa Silver y los scripts de limpieza.
