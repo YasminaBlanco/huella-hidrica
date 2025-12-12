@@ -25,19 +25,15 @@ Escribe con overwrite dinámico por partición (province_key, date_key).
 import os
 from typing import Optional
 
-from pyspark.sql import SparkSession, DataFrame, functions as F
-
-from base_silver_model_job import (
-    DFMap,
-    run_silver_model_job,
-    create_spark_session,
-)
+from base_silver_model_job import DFMap, create_spark_session, run_silver_model_job
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 # ==========================
 # CONFIG: BUCKET Y PATHS
 # ==========================
 
-# Bucket base 
+# Bucket base
 BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
@@ -50,13 +46,13 @@ SILVER_MODEL_BASE_PATH = f"{S3_BASE}/silver/model"
 # ==========================
 # UMBRALES PARA LOS FLAGS
 # ==========================
-DRY_MONTH_TOTAL_MM_THRESHOLD = 10.0          # mm/mes → mes seco si llueve menos que esto
+DRY_MONTH_TOTAL_MM_THRESHOLD = 10.0  # mm/mes → mes seco si llueve menos que esto
 HEAVY_RAIN_MONTH_TOTAL_MM_THRESHOLD = 150.0  # mm/mes → mes de lluvia fuerte
 
 # ==========================
 # RANGO PARA RUNS INCREMENTALES
 # ==========================
-PROCESS_YEAR_ENV = os.getenv("PROCESS_YEAR")    # ej. "2024"
+PROCESS_YEAR_ENV = os.getenv("PROCESS_YEAR")  # ej. "2024"
 PROCESS_MONTH_ENV = os.getenv("PROCESS_MONTH")  # ej. "11"
 
 process_year: Optional[int] = int(PROCESS_YEAR_ENV) if PROCESS_YEAR_ENV else None
@@ -76,7 +72,7 @@ print("============================================================")
 def read_sources(spark: SparkSession) -> DFMap:
     """
     Lee:
-      - climate_daily: clima base 
+      - climate_daily: clima base
       - province_dim: dimensión de provincia
       - date_dim: dimensión de tiempo
 
@@ -120,70 +116,56 @@ def build_climate_monthly_fact(
     """
 
     # 0) Agregación BASE - MENSUAL por país/provincia/año/mes
-    monthly = (
-        df_climate_daily
-        .groupBy("country_iso3", "province_name", "year", "month")
-        .agg(
-            # lluvia total en el mes
-            F.sum("precip_total_mm").alias("precip_total_mm"),
-            # promedio de las temperaturas (sobre los registros del mes)
-            F.avg("temp_max_avg_c").alias("temp_max_avg_c"),
-            F.avg("temp_min_avg_c").alias("temp_min_avg_c"),
-            # ET0 total y promedio mensual
-            F.sum("et0_total_mm").alias("et0_total_mm"),
-            F.avg("et0_avg_mm").alias("et0_avg_mm"),
-        )
+    monthly = df_climate_daily.groupBy(
+        "country_iso3", "province_name", "year", "month"
+    ).agg(
+        # lluvia total en el mes
+        F.sum("precip_total_mm").alias("precip_total_mm"),
+        # promedio de las temperaturas (sobre los registros del mes)
+        F.avg("temp_max_avg_c").alias("temp_max_avg_c"),
+        F.avg("temp_min_avg_c").alias("temp_min_avg_c"),
+        # ET0 total y promedio mensual
+        F.sum("et0_total_mm").alias("et0_total_mm"),
+        F.avg("et0_avg_mm").alias("et0_avg_mm"),
     )
 
     # 0.1) Flags de mes seco / mes de lluvia fuerte basados en la lluvia total mensual
-    monthly = (
-        monthly
-        .withColumn(
-            "dry_month_flag",
-            F.col("precip_total_mm") < F.lit(DRY_MONTH_TOTAL_MM_THRESHOLD),
-        )
-        .withColumn(
-            "heavy_rain_month_flag",
-            F.col("precip_total_mm") > F.lit(HEAVY_RAIN_MONTH_TOTAL_MM_THRESHOLD),
-        )
+    monthly = monthly.withColumn(
+        "dry_month_flag",
+        F.col("precip_total_mm") < F.lit(DRY_MONTH_TOTAL_MM_THRESHOLD),
+    ).withColumn(
+        "heavy_rain_month_flag",
+        F.col("precip_total_mm") > F.lit(HEAVY_RAIN_MONTH_TOTAL_MM_THRESHOLD),
     )
 
     # 1) Mapear province_key usando country_iso3 + province_name
-    base = (
-        monthly.alias("m")
-        .join(
-            df_province.select(
-                "province_key",
-                "country_iso3",
-                "province_name",
-            ).alias("p"),
-            on=["country_iso3", "province_name"],
-            how="left",
-        )
+    base = monthly.alias("m").join(
+        df_province.select(
+            "province_key",
+            "country_iso3",
+            "province_name",
+        ).alias("p"),
+        on=["country_iso3", "province_name"],
+        how="left",
     )
 
     # 2) Obtener date_key del último día de cada mes desde dim_date
     #    (max(date_key) por (year, month))
     end_of_month_dates = (
-        df_date
-        .groupBy("year", "month")
+        df_date.groupBy("year", "month")
         .agg(F.max("date_key").alias("date_key"))
         .distinct()
     )
 
-    fact = (
-        base.alias("b")
-        .join(
-            end_of_month_dates.alias("d"),
-            on=["year", "month"],
-            how="left",
-        )
+    fact = base.alias("b").join(
+        end_of_month_dates.alias("d"),
+        on=["year", "month"],
+        how="left",
     )
 
     # 3) Casts finales a DECIMAL/BOOLEAN y surrogate key
     fact = (
-        fact
-        .withColumn(
+        fact.withColumn(
             "climate_monthly_id",
             F.monotonically_increasing_id().cast("bigint"),
         )
@@ -259,9 +241,7 @@ def build_facts(sources: DFMap, dims: DFMap) -> DFMap:
         df_date,
     )
 
-    return {
-        "climate_monthly": climate_monthly
-    }
+    return {"climate_monthly": climate_monthly}
 
 
 # =============================================================
@@ -275,15 +255,16 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
 
     fact = facts.get("climate_monthly")
     if fact is None or fact.rdd.isEmpty():
-        print("No se construyó la tabla climate_monthly o no hay filas. Nada que escribir.")
+        print(
+            "No se construyó la tabla climate_monthly o no hay filas. Nada que escribir."
+        )
         return
 
     output_path = f"{SILVER_MODEL_BASE_PATH}/climate_monthly"
     print(f"[WRITE] Guardando climate_monthly en {output_path} ...")
 
     (
-        fact.write
-        .mode("overwrite")  # overwrite dinámico por partición
+        fact.write.mode("overwrite")  # overwrite dinámico por partición
         .partitionBy("province_key", "date_key")
         .format("parquet")
         .save(output_path)
@@ -319,7 +300,9 @@ def run(
     if process_month_param is not None:
         process_month = process_month_param
 
-    print(f"[FACT CLIMATE MONTHLY RUN] process_year={process_year}, process_month={process_month}")
+    print(
+        f"[FACT CLIMATE MONTHLY RUN] process_year={process_year}, process_month={process_month}"
+    )
 
     # Ejecutar el template genérico
     run_silver_model_job(
@@ -335,4 +318,3 @@ if __name__ == "__main__":
     spark = create_spark_session(app_name="silver_fact_climate_monthly")
     run(spark)
     spark.stop()
-

@@ -23,19 +23,15 @@ Soporta runs:
 import os
 from typing import Optional
 
-from pyspark.sql import SparkSession, DataFrame, functions as F
-
-from base_silver_model_job import (
-    DFMap,
-    run_silver_model_job,
-    create_spark_session,
-)
+from base_silver_model_job import DFMap, create_spark_session, run_silver_model_job
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 # ==========================
 # CONFIG: BUCKET Y RANGOS
 # ==========================
 
-# Bucket base del proyecto 
+# Bucket base del proyecto
 BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
@@ -115,43 +111,33 @@ def build_socioeconomic_fact(
     )
 
     # 2) JOIN country_key
-    base = (
-        base.alias("s")
-        .join(
-            df_country.select("country_key", "country_iso3").alias("c"),
-            on="country_iso3",
-            how="left",
-        )
+    base = base.alias("s").join(
+        df_country.select("country_key", "country_iso3").alias("c"),
+        on="country_iso3",
+        how="left",
     )
 
     # 3) JOIN indicator_key
-    base = (
-        base.alias("s")
-        .join(
-            df_indicator.select(
-                "indicator_key",
-                "indicator_code",
-            ).alias("i"),
-            on="indicator_code",
-            how="left",
-        )
+    base = base.alias("s").join(
+        df_indicator.select(
+            "indicator_key",
+            "indicator_code",
+        ).alias("i"),
+        on="indicator_code",
+        how="left",
     )
 
     # 4) JOIN date_key (31 de diciembre de cada año)
     end_of_year_dates = (
-        df_date
-        .filter(F.date_format("date", "MM-dd") == "12-31")
+        df_date.filter(F.date_format("date", "MM-dd") == "12-31")
         .select("year", "date_key")
         .distinct()
     )
 
-    base = (
-        base.alias("s")
-        .join(
-            end_of_year_dates.alias("d"),
-            on="year",
-            how="left",
-        )
+    base = base.alias("s").join(
+        end_of_year_dates.alias("d"),
+        on="year",
+        how="left",
     )
 
     # 5) Surrogate key
@@ -222,15 +208,16 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
 
     fact = facts.get("socioeconomic")
     if fact is None or fact.rdd.isEmpty():
-        print("No se construyó la tabla socioeconomic o no hay filas. Nada que escribir.")
+        print(
+            "No se construyó la tabla socioeconomic o no hay filas. Nada que escribir."
+        )
         return
 
     output_path = f"{SILVER_MODEL_BASE_PATH}/socioeconomic"
     print(f"[WRITE] Guardando socioeconomic en {output_path} ...")
 
     (
-        fact.write
-        .mode("overwrite")  # overwrite dinámico por partición
+        fact.write.mode("overwrite")  # overwrite dinámico por partición
         .partitionBy("country_key", "date_key")
         .format("parquet")
         .save(output_path)

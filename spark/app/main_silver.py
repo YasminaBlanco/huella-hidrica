@@ -4,10 +4,10 @@ de datos de manera unificada.
 """
 
 import os
-from pyspark.sql import functions as F
 
 # Importamos la plantilla base con el flujo principal
 from base_silver_job import create_spark_session, run_clean_etl
+from pyspark.sql import functions as F
 
 # Importamos todas las funciones de Estrategia (Lectura, Estandarización, Limpieza, etc.)
 from silver.limpieza_transf import etl_strategies as strategies
@@ -30,17 +30,17 @@ def main():
 
     # Rutas de Lectura (Bronze)
     BASE_BRONZE_METEO = f"{bronze_root}/open_meteo/"
-    BASE_BRONZE_WB    = f"{bronze_root}/world_bank/"
-    BASE_BRONZE_JMP   = f"{bronze_root}/jmp/country=*/year=*"
+    BASE_BRONZE_WB = f"{bronze_root}/world_bank/"
+    # BASE_BRONZE_JMP = f"{bronze_root}/jmp/country=*/year=*"
 
     # Rutas de Escritura (Silver)
     OUTPUT_SILVER_CLIMATE = f"{silver_root}/climate_monthly/"
-    OUTPUT_SILVER_SOCIO   = f"{silver_root}/socioeconomic/"
-    OUTPUT_SILVER_JMP     = f"{silver_root}/jmp/" 
+    OUTPUT_SILVER_SOCIO = f"{silver_root}/socioeconomic/"
+    # OUTPUT_SILVER_JMP = f"{silver_root}/jmp/"
 
     # Periodo a procesar para runs incrementales
-    process_year_env = os.getenv("PROCESS_YEAR")   # ej. "2024"
-    process_month_env = os.getenv("PROCESS_MONTH") # ej. "11"
+    process_year_env = os.getenv("PROCESS_YEAR")  # ej. "2024"
+    process_month_env = os.getenv("PROCESS_MONTH")  # ej. "11"
 
     process_year = int(process_year_env) if process_year_env else None
     process_month = int(process_month_env) if process_month_env else None
@@ -54,7 +54,7 @@ def main():
     # ======================================================
     # 2. CREACIÓN DE LA SESIÓN DE SPARK
     # ======================================================
-    
+
     spark = create_spark_session("Huella_Hidrica_Unified_ETL")
     spark.sparkContext.setLogLevel("WARN")
     print("SparkSession creada con éxito.")

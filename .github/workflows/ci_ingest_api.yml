@@ -1,9 +1,9 @@
-name: CI Orchestrator 
+name: CI Ingest-API
 
-on:                 
+on:
   push:
     branches:
-      - orch
+      - e-api
 
 jobs:
   ci-transform:
@@ -11,23 +11,23 @@ jobs:
 
     defaults:
       run:
-        working-directory: orch
+        working-directory: ingest 
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up python
         uses: actions/setup-python@v4
 
-      - name: Install dependencies
+      - name: Install dependenciesss
         run: pip install flake8 black bandit isort
-
-      - name: Lint with flake8
-        run: flake8 --max-line-length=124 .
 
       - name: Check imports order with isort
         run: isort --profile black --check-only .
-
+      
       - name: Check code format with black
         run: black --check .
+      
+      - name: Lint with flake8
+        run: flake8 --max-line-length=124 .
