@@ -9,7 +9,7 @@ Esta API forma parte del pipeline ELT del proyecto, cuyo flujo de trabajo princi
 
 - Ingesta de datos desde APIs públicas  
 - Transformaciones con PySpark  
-- Orquestación y programción de tareas con Airflow  
+- Orquestación y programación de tareas con Airflow  
 
 Cada módulo está dockerizado para asegurar despliegues consistentes y reproducibles 📦.
 
@@ -25,22 +25,23 @@ La API obtiene y normaliza información proveniente de distintas fuentes externa
 ### 2.2 Exposición de KPIs  
 La API permite acceder a los KPIs generados, sirviendo como fuente de consulta, apta para distintos clientes 🌐.
 
-### 2.3 Arquitectura  
-- Construida en FastAPI.
-- Estructurada de manera modular, facilitando pruebas, mantenimiento y extensión de nuevas funcionalidades.
+## 3. Arquitectura de la API
+
+- Construida en FastAPI.  
+- Estructurada de manera modular, facilitando pruebas, mantenimiento y extensión de nuevas funcionalidades.  
 - Routers principales:
   - `/ingest` → para la ingesta de datos desde las APIs externas  
-  - `/kpis` → para consultar los KPIs generados en la capa gold
+  - `/kpis` → para consultar los KPIs generados en la capa gold  
 - Documentación automática Swagger/OpenAPI  
 - Desplegada con contenedores Docker 📦  
 - Integrable con otros componentes del pipeline
 
-## 3. AWS ☁️
+## 4. AWS ☁️
 
 La API se despliega en una instancia **AWS EC2**.  
 El contenedor Docker se ejecuta en el servidor, exponiendo los endpoints mediante la configuración de los *Security Groups*.
 
-### 3.1 Arquitectura en EC2
+### 4.1 Arquitectura en EC2
 
 - La instancia EC2 ejecuta Docker y Docker Compose 🛠️  
 - La API corre como contenedor  
@@ -48,7 +49,7 @@ El contenedor Docker se ejecuta en el servidor, exponiendo los endpoints mediant
 - Se utilizan **IAM Roles** para dar permisos seguros al contenedor  
 - Acceso externo controlado mediante reglas de seguridad
 
-## 4. Variables de entorno (Local vs. AWS)
+## 5. Variables de entorno (Local vs. AWS)
 
 La API utiliza varias variables de entorno:
 
@@ -63,7 +64,7 @@ API_KEY=
 DEBUG=
 ```
 
-### 4.1 Uso en desarrollo local 🛠️
+### 5.1 Uso en desarrollo local 🛠️
 
 En local, estos valores viven en un archivo `.env`:
 
@@ -78,25 +79,25 @@ API_KEY=tu_api_key
 DEBUG=True
 ```
 
-### 4.2 Uso en AWS (producción) ⚠️
+### 5.2 Uso en AWS (producción) ⚠️
 
 En producción **no se recomienda usar un archivo `.env`**.  
 
 #### ✔ IAM Role + Variables de entorno
 
 - La instancia EC2 recibe un IAM Role con permisos para acceder al bucket S3 ✅  
-- Variables internas (`REDIS_HOST`, `REDIS_PORT`, etc.) se definen en `/etc/environment`
+- Variables internas (`REDIS_HOST`, `REDIS_PORT`, etc.) se definen en `/etc/environment` o se obtienen desde **Secrets Manager / Parameter Store**.
 
-## 5. Levantar la API 🚀
+## 6. Levantar la API 🚀
 
-### 5.1 Clonar el repositorio
+### 6.1 Clonar el repositorio
 
 ```bash
 git clone https://github.com/YasminaBlanco/huella-hidrica.git
 cd huella-hidrica/ingest
 ```
 
-### 5.2 Levantar los servicios con Docker Compose 📦
+### 6.2 Levantar los servicios con Docker Compose 📦
 
 #### Local
 
@@ -132,7 +133,7 @@ Asegurarse de:
 - Que el contenedor `api` pueda acceder a S3 mediante IAM Role  
 - Que `REDIS_HOST` apunte a la dirección correcta del servicio Redis en producción
 
-### 5.3 Notas importantes ⚠️
+### 6.3 Notas importantes ⚠️
 
 - El `docker-compose.yml` monta el directorio actual dentro del contenedor para desarrollo (`volumes: - ./:/app`)  
 - Redis es un servicio dependiente de la API (`depends_on`)  
@@ -143,7 +144,7 @@ Asegurarse de:
 docker-compose down
 ```
 
-## 6. Endpoints 🌐
+## 7. Endpoints 🌐
 
 **Documentación automática:**
 
@@ -151,12 +152,11 @@ docker-compose down
 http://<host>:8000/docs
 ```
 
-## 7. Buenas prácticas ✅
+## 8. Buenas prácticas ✅
 
 - La API es de fácil extensión a nuevas fuentes de datos.  
-- Se tienen **tests** para asegurar la calidad del código y el funcionamiento de la API. 
+- Se tienen **tests** para asegurar la calidad del código y facilitar el desarrollo iterativo.  
 - No se almacenan credenciales en repositorios.  
 - No se usan `AWS_ACCESS_KEY_ID` en EC2; se utilizan **IAM Roles y políticas** para la seguridad.  
 - Documentar nuevos endpoints en Swagger/OpenAPI.  
 - Mantener las imágenes Docker **ligeras y reproducibles**
-
