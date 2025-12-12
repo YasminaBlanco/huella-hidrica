@@ -1,8 +1,8 @@
 name: CI Ochestrator
 
-  push:
-    branches:
-      - orch
+push:
+  branches:
+    - orch
 
 jobs:
   ci-transform:
