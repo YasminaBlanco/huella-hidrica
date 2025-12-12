@@ -154,7 +154,8 @@ http://<host>:8000/docs
 
 ## 8. Buenas prácticas ✅
 
-- La API es de fácil extensión a nuevas fuentes de datos.  
+- La API es de fácil extensión a nuevas fuentes de datos.
+- Los endpoints de ingesta son **idempotentes**, evitando duplicar datos en caso de que sean necesarios reintentos de ejecución.
 - Se tienen **tests** para asegurar la calidad del código y facilitar el desarrollo iterativo.  
 - No se almacenan credenciales en repositorios.  
 - No se usan `AWS_ACCESS_KEY_ID` en EC2; se utilizan **IAM Roles y políticas** para la seguridad.  
