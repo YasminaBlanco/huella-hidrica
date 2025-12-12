@@ -35,7 +35,8 @@ Soporta dos modos:
 import os
 from typing import Optional
 
-from base_silver_model_job import DFMap, create_spark_session, run_silver_model_job
+from base_silver_model_job import (DFMap, create_spark_session,
+                                   run_silver_model_job)
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql import types as T

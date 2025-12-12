@@ -8,7 +8,6 @@ import os
 # Importamos la plantilla base con el flujo principal
 from base_silver_job import create_spark_session, run_clean_etl
 from pyspark.sql import functions as F
-
 # Importamos todas las funciones de Estrategia (Lectura, Estandarización, Limpieza, etc.)
 from silver.limpieza_transf import etl_strategies as strategies
 from silver.limpieza_transf import jmp_silver_job as jmp
