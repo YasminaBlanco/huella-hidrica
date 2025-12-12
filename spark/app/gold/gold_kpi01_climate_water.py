@@ -28,6 +28,10 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
     SAFE_SERVICE_LEVEL_KEYS = [5]  # at least basic
     RESIDENCE_TYPE_KEYS = [1, 2]  # urban, rural
 
+    def __init__(self, spark, silver_model_base_path, gold_model_base_path):
+        super().__init__(spark, silver_model_base_path, gold_model_base_path)
+        self.spark.conf.set("spark.sql.shuffle.partitions", "32")
+
     def kpi_name(self) -> str:
         return "KPI01_Climate_Water"
 
@@ -38,11 +42,12 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
 
     def _year_from_date_key(self, col_name: str):
         """
-        Deriva el año a partir de date_key (YYYYMMDD) usando aritmética
+        Deriva el año a partir de date_key (YYYYMMDD) usando aritmética:
+        (YYYYMMDD / 10000) -> YYYY
         """
         return (F.col(col_name).cast("bigint") / F.lit(10000)).cast("int")
 
-    # ---------------- Lógica principal OPTIMIZADA ----------------
+    # ---------------- Lógica principal ----------------
 
     def build(self) -> DataFrame:
         # ======================
@@ -55,17 +60,19 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
             "country_iso3",
             "country_name",
         )
-        # PREPARACIÓN BROADCAST: Dimensión País
         B_country_df = F.broadcast(country_df)
 
         res_type_df = self.read_silver_table(self.RES_TYPE_TABLE).select(
             "residence_type_key",
             "residence_type_desc",
         )
-        # PREPARACIÓN BROADCAST: Dimensión Tipo de Residencia
         B_res_type_df = F.broadcast(res_type_df)
 
-        # Leer Tablas de Hechos
+        # ======================
+        # 2) Leer hechos y derivar año
+        # ======================
+        self.log("Leyendo hechos de clima anual y cobertura WASH...")
+
         climate_raw = self.read_silver_table(self.CLIMATE_TABLE).select(
             "country_key",
             "date_key",
@@ -80,9 +87,6 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
             F.col("coverage_pct").cast("double").alias("coverage_pct"),
         )
 
-        # ============================================================
-        # 2) Derivar año en hechos
-        # ============================================================
         self.log("Derivando columna 'year' a partir de date_key...")
 
         climate_with_year = climate_raw.withColumn(
@@ -93,7 +97,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         )
 
         # ===============================================
-        # 3) Filtrar WASH a agua segura y países MEX/ARG
+        # 3) Filtrar WASH a agua segura + enriquecer dims
         # ===============================================
         self.log(
             "Aplicando filtros de agua segura y usando Broadcast para enriquecimiento..."
@@ -154,13 +158,12 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         self.log(f"Rango de años detectado: {min_year} - {max_year}")
 
         # ============================
-        # 5) Preparar clima anual MEX/ARG
+        # 4) Preparar clima anual MEX/ARG
         # ============================
-        self.log("Filtrando clima anual por países y rango de años...")
+        self.log("Filtrando clima anual por países MEX/ARG...")
 
         climate_for_countries = (
             climate_with_year
-            # USO DE BROADCAST: Join con dimensión país
             .join(B_country_df, on="country_key", how="left")
             .filter(F.col("country_iso3").isin(self.COUNTRIES_ISO3_FILTER))
             .filter(
@@ -178,7 +181,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         )
 
         # ============================
-        # 6) Unir clima + agua segura
+        # 5) Unir clima + agua segura
         # ============================
         self.log("Uniendo clima anual con agua segura por (country, year)...")
 
@@ -214,7 +217,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
             return self.spark.createDataFrame([], schema)
 
         # ==========================================
-        # 7) Calcular variaciones anuales (deltas)
+        # 6) Calcular variaciones anuales (deltas)
         # ==========================================
         self.log("Calculando variaciones anuales (deltas)...")
 
@@ -238,7 +241,7 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         )
 
         # ==========================================
-        # 8) Calcular correlación por país + residencia
+        # 7) Correlación por país + residencia
         # ==========================================
         self.log("Calculando correlación entre deltas clima vs agua segura...")
 
@@ -280,9 +283,11 @@ class GoldKPI01ClimateWater(BaseGoldKPIJob):
         B_agg_corr = F.broadcast(agg_corr)
 
         # ==========================================
-        # 9) Combinar series anuales + métricas agregadas
+        # 8) Combinar series anuales + métricas agregadas
         # ==========================================
-        self.log("Combinando series anuales con correlación, riesgo y dirección...")
+        self.log(
+            "Combinando series anuales con correlación, riesgo y dirección..."
+        )
 
         final_df = (
             deltas
@@ -321,3 +326,4 @@ def run(
         gold_model_base_path=gold_model_base_path,
     )
     job.run()
+

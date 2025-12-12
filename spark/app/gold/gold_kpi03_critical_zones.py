@@ -1,6 +1,8 @@
 # gold_kpi03_critical_zones.py
 #
 # Zonas Críticas (Clima + Saneamiento) para México y Argentina.
+#
+
 
 from base_gold_model_job import BaseGoldKPIJob
 from pyspark.sql import DataFrame
@@ -14,11 +16,9 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
     Pregunta de negocio:
       En México y Argentina, ¿podemos localizar zonas donde coinciden baja
       cobertura de saneamiento y una tendencia climática de disminución de lluvias?
-
     """
 
     # -------- Tablas SILVER --------
-
     CLIMATE_TABLE = "climate_monthly"
     WASH_TABLE = "wash_coverage"
     COUNTRY_TABLE = "country"
@@ -28,98 +28,242 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
     PROVINCE_NAME_COL = "province_name"
 
     # -------- Config constantes --------
+    # Servicio SANITATION
     SANITATION_SERVICE_TYPE_KEY = 0
+    # Niveles que consideramos "mal saneamiento"
     SANITATION_BAD_LEVEL_KEYS = [1, 2, 4]
-    SANITATION_RESIDENCE_KEYS = [1]  # Urbano
+    # Sólo urbano
+    SANITATION_RESIDENCE_KEYS = [1]
+
+    # Umbral de saneamiento básico considerado "adecuado"
     SANITATION_THRESHOLD = 80.0
 
+    # Solo analizamos estos países
     TARGET_COUNTRIES_ISO3 = ["MEX", "ARG"]
 
+    # Umbrales para tendencia climática (correlación año vs precipitación)
     CLIMATE_DECREASING_CORR_THRESHOLD = -0.3
     CLIMATE_INCREASING_CORR_THRESHOLD = 0.3
     MIN_YEARS_FOR_TREND = 3
 
+    def __init__(self, spark, silver_model_base_path, gold_model_base_path):
+        super().__init__(spark, silver_model_base_path, gold_model_base_path)
+        
+        self.spark.conf.set("spark.sql.shuffle.partitions", "16")
+
+    # ------------------------------------------------------------------
+    # Metadatos del KPI
+    # ------------------------------------------------------------------
     def kpi_name(self) -> str:
         return "KPI03_Critical_Zones_Climate_Sanitation"
 
     def output_path(self) -> str:
         return f"{self.gold_base}/kpi03_critical_zones"
 
-    # ----------------- Helper de Fecha  -----------------
-
+    # ------------------------------------------------------------------
+    # Helper internos
+    # ------------------------------------------------------------------
     def _year_from_date_key(self, col_name: str):
         """
-        Deriva el año a partir de date_key (YYYYMMDD)usando aritmética
+        Deriva el año a partir de date_key (YYYYMMDD) usando aritmética:
+        (YYYYMMDD / 10000) -> YYYY
         """
-        # (YYYYMMDD / 10000) -> YYYY.MMDD... -> YYYY
         return (F.col(col_name).cast("bigint") / F.lit(10000)).cast("int")
 
-    # ----------------- Lógica principal OPTIMIZADA -----------------
-
+    # ------------------------------------------------------------------
+    # Lógica principal
+    # ------------------------------------------------------------------
     def build(self) -> DataFrame:
         self.log("Leyendo dimensiones country y province...")
 
-        # Dim país
+        # ==========================
+        # Dimensión país
+        # ==========================
         country_df = self.read_silver_table(self.COUNTRY_TABLE).select(
-            "country_key",
-            "country_iso3",
-            "country_name",
+            "country_key", "country_iso3", "country_name"
         )
-        # PREPARACIÓN BROADCAST
         B_country_df = F.broadcast(country_df)
 
-        # Dim provincia
+        # Países objetivo (MEX / ARG) -> lista de country_key
+        target_countries_df = country_df.filter(
+            F.col("country_iso3").isin(self.TARGET_COUNTRIES_ISO3)
+        )
+        target_country_keys = [
+            row["country_key"]
+            for row in target_countries_df.select("country_key").distinct().collect()
+        ]
+
+        # ==========================
+        # Dimensión provincia
+        # ==========================
         province_df = self.read_silver_table(self.PROVINCE_TABLE).select(
-            self.PROVINCE_KEY_COL,
-            "country_iso3",
-            self.PROVINCE_NAME_COL,
+            self.PROVINCE_KEY_COL, "country_iso3", self.PROVINCE_NAME_COL
         )
 
-        province_with_country = province_df.join(
-            country_df, on="country_iso3", how="left"
+        province_with_country = (
+            province_df.join(country_df, on="country_iso3", how="left")
+            .filter(F.col("country_iso3").isin(self.TARGET_COUNTRIES_ISO3))
+            .select(
+                "country_key",
+                "country_iso3",
+                "country_name",
+                self.PROVINCE_KEY_COL,
+                self.PROVINCE_NAME_COL,
+            )
         )
-        # PREPARACIÓN BROADCAST
         B_province_with_country = F.broadcast(province_with_country)
 
+        # Lista de province_key objetivo (solo MEX/ARG)
+        province_keys = [
+            row[self.PROVINCE_KEY_COL]
+            for row in province_with_country.select(self.PROVINCE_KEY_COL)
+            .distinct()
+            .collect()
+        ]
+
         # =====================================================
-        # 1) Clima mensual- clima anual
+        # 1) Saneamiento anual (urbano) por país / año
         # =====================================================
-        self.log("Preparando clima mensual (derivando year y aplicando filtros)...")
+        self.log("Preparando saneamiento urbano por país/año...")
 
-        climate_raw = self.read_silver_table(self.CLIMATE_TABLE).select(
-            self.PROVINCE_KEY_COL,
-            "date_key",
-            "precip_total_mm",
-        )
-
-        climate_with_year = climate_raw.withColumn(
-            "year", self._year_from_date_key("date_key")
-        )
-
-        climate_enriched = (
-            climate_with_year
-            # USO DE BROADCAST
-            .join(B_province_with_country, on=self.PROVINCE_KEY_COL, how="left").filter(
-                F.col("country_iso3").isin(self.TARGET_COUNTRIES_ISO3)
+        wash_raw = (
+            self.read_silver_table(self.WASH_TABLE)
+            .where(F.col("country_key").isin(target_country_keys))
+            .select(
+                "country_key",
+                "date_key",
+                "residence_type_key",
+                "service_type_key",
+                "service_level_key",
+                F.col("coverage_pct").cast("double").alias("coverage_pct"),
             )
         )
 
-        self.log("Agregando clima anual (suma de precipitación mensual)...")
+        wash_with_year = wash_raw.withColumn(
+            "year", self._year_from_date_key("date_key")
+        )
 
-        climate_yearly = climate_enriched.groupBy(
-            "country_key",
-            "country_name",
-            "country_iso3",
-            self.PROVINCE_KEY_COL,
-            self.PROVINCE_NAME_COL,
-            "year",
-        ).agg(
-            # Cast a double dentro de F.sum()
-            F.sum(F.col("precip_total_mm").cast("double")).alias("precip_total_mm_year")
+        wash_sanitation = wash_with_year.filter(
+            (F.col("service_type_key") == self.SANITATION_SERVICE_TYPE_KEY)
+            & (F.col("residence_type_key").isin(self.SANITATION_RESIDENCE_KEYS))
+        )
+
+        sanitation_yearly = (
+            wash_sanitation.groupBy("country_key", "year")
+            .agg(
+                F.sum(
+                    F.when(
+                        F.col("service_level_key").isin(
+                            self.SANITATION_BAD_LEVEL_KEYS
+                        ),
+                        F.col("coverage_pct"),
+                    ).otherwise(F.lit(0.0))
+                ).alias("pct_bad_sanitation")
+            )
+            .withColumn(
+                "sanitation_basic_pct",
+                F.lit(100.0) - F.col("pct_bad_sanitation"),
+            )
+            .withColumn(
+                "is_low_sanitation",
+                F.col("sanitation_basic_pct") < self.SANITATION_THRESHOLD,
+            )
+        )
+
+        sanitation_yearly = sanitation_yearly.cache()
+
+        if sanitation_yearly.rdd.isEmpty():
+            self.log(
+                "No hay datos de saneamiento para los países objetivo. "
+                "Devolviendo DataFrame vacío."
+            )
+            schema = (
+                "country_key INT, country_name STRING, "
+                f"{self.PROVINCE_KEY_COL} INT, {self.PROVINCE_NAME_COL} STRING, "
+                "year INT, "
+                "sanitation_basic_pct DOUBLE, is_low_sanitation BOOLEAN, "
+                "precip_total_mm_year DOUBLE, climate_trend STRING, "
+                "is_climate_neg_trend BOOLEAN, is_critical_zone BOOLEAN"
+            )
+            return self.spark.createDataFrame([], schema)
+
+        # Rango de años observado en saneamiento
+        stats_years = sanitation_yearly.agg(
+            F.min("year").alias("min_year"),
+            F.max("year").alias("max_year"),
+        ).collect()[0]
+        min_year = stats_years["min_year"]
+        max_year = stats_years["max_year"]
+
+        self.log(
+            f"Rango de años en saneamiento (para recortar clima): {min_year} - {max_year}"
+        )
+
+        # Nombres e ISO3 al DF de saneamiento
+        sanitation_yearly = sanitation_yearly.join(
+            B_country_df.select("country_key", "country_name", "country_iso3"),
+            on="country_key",
+            how="left",
+        )
+
+        B_sanitation_yearly = F.broadcast(
+            sanitation_yearly.select(
+                "country_key",
+                "country_name",
+                "country_iso3",
+                "year",
+                "sanitation_basic_pct",
+                "is_low_sanitation",
+            )
         )
 
         # =====================================================
-        # 2) Tendencia climática
+        # 2) Clima mensual -> clima anual por provincia
+        # =====================================================
+        self.log(
+            "Preparando clima mensual filtrado por provincias objetivo y rango de años..."
+        )
+
+        climate_raw = (
+            self.read_silver_table(self.CLIMATE_TABLE)
+            .where(F.col(self.PROVINCE_KEY_COL).isin(province_keys))
+            .select(
+                self.PROVINCE_KEY_COL,
+                "date_key",
+                F.col("precip_total_mm").cast("double").alias("precip_total_mm"),
+            )
+        )
+
+        climate_with_year = (
+            climate_raw.withColumn("year", self._year_from_date_key("date_key"))
+            .filter(
+                (F.col("year") >= F.lit(min_year))
+                & (F.col("year") <= F.lit(max_year))
+            )
+        )
+
+        climate_enriched = climate_with_year.join(
+            B_province_with_country, on=self.PROVINCE_KEY_COL, how="inner"
+        )
+
+        self.log("Agregando clima anual (suma de precipitación mensual).")
+
+        climate_yearly = (
+            climate_enriched.groupBy(
+                "country_key",
+                "country_name",
+                "country_iso3",
+                self.PROVINCE_KEY_COL,
+                self.PROVINCE_NAME_COL,
+                "year",
+            )
+            .agg(
+                F.sum("precip_total_mm").alias("precip_total_mm_year"),
+            )
+        )
+
+        # =====================================================
+        # 3) Tendencia climática por provincia
         # =====================================================
         self.log("Calculando tendencia climática por provincia...")
 
@@ -142,21 +286,23 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
                     F.lit("uncertain"),
                 )
                 .when(
-                    F.col("corr_year_precip") <= self.CLIMATE_DECREASING_CORR_THRESHOLD,
+                    F.col("corr_year_precip")
+                    <= self.CLIMATE_DECREASING_CORR_THRESHOLD,
                     F.lit("decreasing"),
                 )
                 .when(
-                    F.col("corr_year_precip") >= self.CLIMATE_INCREASING_CORR_THRESHOLD,
+                    F.col("corr_year_precip")
+                    >= self.CLIMATE_INCREASING_CORR_THRESHOLD,
                     F.lit("increasing"),
                 )
                 .otherwise(F.lit("stable")),
             )
             .withColumn(
-                "is_climate_neg_trend", F.col("climate_trend") == F.lit("decreasing")
+                "is_climate_neg_trend",
+                F.col("climate_trend") == F.lit("decreasing"),
             )
         )
 
-        # PREPARACIÓN BROADCAST
         B_climate_trend_stats = F.broadcast(
             climate_trend_stats.select(
                 "country_key",
@@ -170,73 +316,14 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
         )
 
         # =====================================================
-        # 3) Saneamiento anual
+        # 4) Combinar clima (provincia/año) + saneamiento (país/año)
         # =====================================================
-        self.log("Preparando saneamiento urbano por país / año...")
-
-        wash_raw = self.read_silver_table(self.WASH_TABLE).select(
-            "country_key",
-            "date_key",
-            "residence_type_key",
-            "service_type_key",
-            "service_level_key",
-            F.col("coverage_pct").cast("double").alias("coverage_pct"),
+        self.log(
+            "Combinando clima por provincia/año con saneamiento por país/año..."
         )
-        wash_with_year = wash_raw.withColumn(
-            "year", self._year_from_date_key("date_key")
-        )
-
-        wash_sanitation = (
-            wash_with_year.filter(
-                F.col("service_type_key") == self.SANITATION_SERVICE_TYPE_KEY
-            )
-            .filter(F.col("residence_type_key").isin(self.SANITATION_RESIDENCE_KEYS))
-            # USO DE BROADCAST
-            .join(B_country_df, on="country_key", how="left")
-            .filter(F.col("country_iso3").isin(self.TARGET_COUNTRIES_ISO3))
-        )
-
-        sanitation_yearly = (
-            wash_sanitation.groupBy(
-                "country_key", "country_name", "country_iso3", "year"
-            )
-            .agg(
-                F.sum(
-                    F.when(
-                        F.col("service_level_key").isin(self.SANITATION_BAD_LEVEL_KEYS),
-                        F.col("coverage_pct"),
-                    ).otherwise(F.lit(0.0))
-                ).alias("pct_bad_sanitation")
-            )
-            .withColumn(
-                "sanitation_basic_pct", F.lit(100.0) - F.col("pct_bad_sanitation")
-            )
-            .withColumn(
-                "is_low_sanitation",
-                F.col("sanitation_basic_pct") < self.SANITATION_THRESHOLD,
-            )
-        )
-
-        # PREPARACIÓN BROADCAST
-        B_sanitation_yearly = F.broadcast(
-            sanitation_yearly.select(
-                "country_key",
-                "year",
-                "sanitation_basic_pct",
-                "is_low_sanitation",
-            )
-        )
-
-        # =====================================================
-        # 4) Combinar clima + saneamiento
-        # =====================================================
-
-        self.log("Combinando clima por provincia/año con saneamiento por país/año...")
 
         zones = (
-            climate_yearly
-            # USO DE BROADCAST
-            .join(
+            climate_yearly.join(
                 B_climate_trend_stats,
                 on=[
                     "country_key",
@@ -247,13 +334,7 @@ class GoldKPI03CriticalZones(BaseGoldKPIJob):
                 ],
                 how="left",
             )
-            # USO DE BROADCAST
-            .join(B_sanitation_yearly, on=["country_key", "year"], how="left")
         )
-
-        # =====================================================
-        # 5-8) Filtrar, marcar crítica y calcular stats
-        # =====================================================
 
         zones_complete = zones.filter(F.col("sanitation_basic_pct").isNotNull())
         zones_complete = zones_complete.withColumn(
