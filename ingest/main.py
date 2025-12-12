@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from routers import ingest, kpi
 
-app = FastAPI(title="Huella Hídrica LATAM", version="1.0.0")
+app = FastAPI(title="Huella Hídrica LATAM", version="0.0.1")
 
 app.include_router(ingest.router)
 app.include_router(kpi.router)
