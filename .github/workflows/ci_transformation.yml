@@ -23,12 +23,14 @@ jobs:
       - name: Install dependenciesss
         run: pip install flake8 black bandit isort
 
+      - name: Check imports order with isort
+        run: isort --check-only .
+      
+      - name: Check code format with black
+        run: black --check .
+      
       - name: Lint with flake8
         run: flake8 --max-line-length=124 .
 
-      - name: Check imports order with isort
-        run: isort --check-only .
 
-      - name: Check code format with black
-        run: black --check .
 
