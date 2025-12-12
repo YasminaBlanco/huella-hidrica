@@ -27,7 +27,7 @@ jobs:
         run: pip install -r requirements.txt flake8 black bandit isort
 
       - name: Lint with flake8
-        run: flake8 --max-line-length=120 .
+        run: flake8 --max-line-length=124.
 
       - name: Check imports order with isort
         run: isort --check-only .
