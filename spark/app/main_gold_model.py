@@ -30,7 +30,7 @@ from gold import (
 # 0. CONFIG RUTAS S3
 # ==========================
 
-# variable BASE_BUCKET 
+# variable BASE_BUCKET
 BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
@@ -44,6 +44,7 @@ GOLD_MODEL_BASE_PATH = f"{S3_BASE}/gold/model"
 # ============================================================
 # 1. Helpers de validación sobre Silver
 # ============================================================
+
 
 def validate_silver_tables(
     spark: SparkSession,
@@ -86,6 +87,7 @@ def validate_silver_tables(
 # 2. main()
 # ============================================================
 
+
 def main() -> None:
     print("============================================================")
     print("[GOLD MODEL CONFIG] BASE_BUCKET   =", BASE_BUCKET)
@@ -105,13 +107,12 @@ def main() -> None:
             "wash_coverage",
             "climate_annual",
             "climate_monthly",
-            "socioeconomic",   
-
+            "socioeconomic",
             # Dimensiones clave
             "country",
-            "province",        
+            "province",
             "residence_type",
-            "indicator",       
+            "indicator",
         ]
         validate_silver_tables(spark, SILVER_MODEL_BASE_PATH, required_tables)
 
@@ -168,7 +169,9 @@ def main() -> None:
 
         # ================== KPI 04 ==================
         print("\n" + "=" * 80)
-        print(">>> CREANDO TABLA GOLD KPI 04 - ÍNDICE PONDERADO DE RIESGO SANITARIO <<<")
+        print(
+            ">>> CREANDO TABLA GOLD KPI 04 - ÍNDICE PONDERADO DE RIESGO SANITARIO <<<"
+        )
         print("=" * 80)
         print(
             "Granularidad: country + year\n"

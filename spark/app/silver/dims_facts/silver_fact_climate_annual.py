@@ -47,7 +47,7 @@ from base_silver_model_job import (
 # CONFIG: BUCKET Y RANGOS
 # ==========================
 
-# Bucket base 
+# Bucket base
 BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 S3_BASE = f"s3a://{BASE_BUCKET}"
 
@@ -112,72 +112,53 @@ def build_climate_annual_fact(
     """
 
     # Castear flags booleanos a entero para que SUM funcione sin errores
-    df_climate_casteado = (
-        df_climate
-        .withColumn(
-            "dry_month_flag_int",
-            F.col("dry_day_flag").cast(T.IntegerType()),
-        )
-        .withColumn(
-            "heavy_rain_month_flag_int",
-            F.col("heavy_rain_day_flag").cast(T.IntegerType()),
-        )
+    df_climate_casteado = df_climate.withColumn(
+        "dry_month_flag_int",
+        F.col("dry_day_flag").cast(T.IntegerType()),
+    ).withColumn(
+        "heavy_rain_month_flag_int",
+        F.col("heavy_rain_day_flag").cast(T.IntegerType()),
     )
 
     # 1) Agregación anual por (country_iso3, year)
-    annual_base = (
-        df_climate_casteado
-        .groupBy("country_iso3", "year")
-        .agg(
-            # Precipitación
-            F.sum("precip_total_mm").alias("precip_total_mm_year"),
-            (F.sum("precip_total_mm") / F.lit(12)).alias("precip_avg_mm_year"),
-
-            # Temperatura
-            F.avg("temp_max_avg_c").alias("temp_max_avg_year"),
-            F.avg("temp_min_avg_c").alias("temp_min_avg_year"),
-
-            # Evapotranspiración
-            F.sum("et0_total_mm").alias("et0_total_mm_year"),
-            F.avg("et0_avg_mm").alias("et0_avg_mm_year"),
-
-            # Contar meses secos / de lluvia intensa
-            F.sum("dry_month_flag_int").alias("dry_months"),
-            F.sum("heavy_rain_month_flag_int").alias("heavy_rain_months"),
-
-            # Índices (meses extremos / 12)
-            (F.sum("dry_month_flag_int") / F.lit(12)).alias("drought_index"),
-            (F.sum("heavy_rain_month_flag_int") / F.lit(12)).alias("heavy_rain_index"),
-        )
+    annual_base = df_climate_casteado.groupBy("country_iso3", "year").agg(
+        # Precipitación
+        F.sum("precip_total_mm").alias("precip_total_mm_year"),
+        (F.sum("precip_total_mm") / F.lit(12)).alias("precip_avg_mm_year"),
+        # Temperatura
+        F.avg("temp_max_avg_c").alias("temp_max_avg_year"),
+        F.avg("temp_min_avg_c").alias("temp_min_avg_year"),
+        # Evapotranspiración
+        F.sum("et0_total_mm").alias("et0_total_mm_year"),
+        F.avg("et0_avg_mm").alias("et0_avg_mm_year"),
+        # Contar meses secos / de lluvia intensa
+        F.sum("dry_month_flag_int").alias("dry_months"),
+        F.sum("heavy_rain_month_flag_int").alias("heavy_rain_months"),
+        # Índices (meses extremos / 12)
+        (F.sum("dry_month_flag_int") / F.lit(12)).alias("drought_index"),
+        (F.sum("heavy_rain_month_flag_int") / F.lit(12)).alias("heavy_rain_index"),
     )
 
     base = annual_base
 
     # 2) JOIN #1: agregar country_key usando country_iso3
-    base = (
-        base.alias("c_f")
-        .join(
-            df_country.select("country_key", "country_iso3").alias("c_d"),
-            on="country_iso3",
-            how="left",
-        )
+    base = base.alias("c_f").join(
+        df_country.select("country_key", "country_iso3").alias("c_d"),
+        on="country_iso3",
+        how="left",
     )
 
     # 3) JOIN #2: mapear year - date_key anual (31/12)
     end_of_year_dates = (
-        df_date
-        .filter(F.date_format("date", "MM-dd") == "12-31")  # 31 de diciembre
+        df_date.filter(F.date_format("date", "MM-dd") == "12-31")  # 31 de diciembre
         .select("year", "date_key")
         .distinct()
     )
 
-    base = (
-        base.alias("c_f")
-        .join(
-            end_of_year_dates.alias("d"),
-            on="year",
-            how="left",
-        )
+    base = base.alias("c_f").join(
+        end_of_year_dates.alias("d"),
+        on="year",
+        how="left",
     )
 
     # 4) Crear surrogate key para la fact (PK)
@@ -188,8 +169,7 @@ def build_climate_annual_fact(
 
     # 5) Tipos de datos para las métricas
     fact = (
-        fact
-        .withColumn(
+        fact.withColumn(
             "precip_total_mm_year",
             F.col("precip_total_mm_year").cast("decimal(10, 2)"),
         )
@@ -231,7 +211,7 @@ def build_climate_annual_fact(
         )
     )
 
-    # 6) Seleccionar columnas finales 
+    # 6) Seleccionar columnas finales
     fact = fact.select(
         "climate_annual_id",
         "country_key",
@@ -276,9 +256,7 @@ def build_facts(sources: DFMap, dims: DFMap) -> DFMap:
         df_date,
     )
 
-    return {
-        "climate_annual": climate_annual_fact
-    }
+    return {"climate_annual": climate_annual_fact}
 
 
 # =============================================================
@@ -297,15 +275,16 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
 
     fact = facts.get("climate_annual")
     if fact is None or fact.rdd.isEmpty():
-        print("No se construyó la tabla climate_annual o no hay filas. Nada que escribir.")
+        print(
+            "No se construyó la tabla climate_annual o no hay filas. Nada que escribir."
+        )
         return
 
     output_path = f"{SILVER_MODEL_BASE_PATH}/climate_annual"
     print(f"[WRITE] Guardando climate_annual en {output_path} ...")
 
     (
-        fact.write
-        .mode("overwrite")  # overwrite dinámico por partición
+        fact.write.mode("overwrite")  # overwrite dinámico por partición
         .partitionBy("country_key", "date_key")
         .format("parquet")
         .save(output_path)

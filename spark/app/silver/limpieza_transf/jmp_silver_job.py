@@ -16,7 +16,7 @@ BASE_BUCKET = os.getenv("BASE_BUCKET", "henry-pf-g2-huella-hidrica")
 BRONZE_JMP_PATH = f"s3a://{BASE_BUCKET}/bronze/jmp/country=*/year=*"
 SILVER_JMP_CLEAN_PATH = f"s3a://{BASE_BUCKET}/silver/jmp/"
 
-# Opcional para procesar solo un año concreto 
+# Opcional para procesar solo un año concreto
 PROCESS_YEAR_ENV = os.getenv("PROCESS_YEAR")
 PROCESS_YEAR = int(PROCESS_YEAR_ENV) if PROCESS_YEAR_ENV else None
 
@@ -25,17 +25,14 @@ PROCESS_YEAR = int(PROCESS_YEAR_ENV) if PROCESS_YEAR_ENV else None
 # 1) LECTURA DESDE BRONZE
 # ==========================
 
+
 def read_jmp_func(spark_session) -> DataFrame:
     """
     Lee el bronze de JMP desde S3.
     Si se define PROCESS_YEAR, filtra por ese año en la columna 'Year'.
     """
     print(f"[JMP] Leyendo desde: {BRONZE_JMP_PATH}")
-    df = (
-        spark_session.read
-        .option("mergeSchema", "true")
-        .parquet(BRONZE_JMP_PATH)
-    )
+    df = spark_session.read.option("mergeSchema", "true").parquet(BRONZE_JMP_PATH)
 
     if PROCESS_YEAR is not None:
         df = df.filter(F.col("Year") == PROCESS_YEAR)
@@ -46,6 +43,7 @@ def read_jmp_func(spark_session) -> DataFrame:
 # ==========================
 # 2) ESTANDARIZAR COLUMNAS Y TIPOS
 # ==========================
+
 
 def standardize_jmp_func(df: DataFrame) -> DataFrame:
     """
@@ -60,27 +58,23 @@ def standardize_jmp_func(df: DataFrame) -> DataFrame:
     # --- Residence Type: code ---
     res_code = (
         F.when(res_desc == "total", "TOT")
-         .when(res_desc == "urban", "URB")
-         .when(res_desc == "rural", "RUR")
-         .otherwise("UNK")
+        .when(res_desc == "urban", "URB")
+        .when(res_desc == "rural", "RUR")
+        .otherwise("UNK")
     )
 
     return df.select(
         # Dimensión país
         F.col("ISO3").alias("country_iso3"),
         F.col("Country").alias("country_name"),
-
         # Año (nivel anual para JMP)
         F.col("Year").cast(T.IntegerType()).alias("year"),
-
         # Residence Type (code + desc)
         res_code.alias("residence_type_code"),
-
         # Dimensiones de residencia / servicio
         res_desc.alias("residence_type_desc"),
         F.lower(F.col("Service Type")).alias("service_type_desc"),
         F.lower(F.col("Service Level")).alias("service_level_desc"),
-
         # Medidas (indicadores)
         F.col("Coverage").cast(T.DecimalType(5, 2)).alias("coverage_pct"),
         F.col("Population").cast(T.LongType()).alias("population_total"),
@@ -90,6 +84,7 @@ def standardize_jmp_func(df: DataFrame) -> DataFrame:
 # ==========================
 # 3) VALIDACIONES DE CALIDAD
 # ==========================
+
 
 def dq_jmp_func(df: DataFrame):
     """
@@ -125,6 +120,7 @@ def dq_jmp_func(df: DataFrame):
 # ==========================
 # 4) LIMPIEZA
 # ==========================
+
 
 def clean_jmp_func(df: DataFrame) -> DataFrame:
     """
@@ -166,6 +162,7 @@ def clean_jmp_func(df: DataFrame) -> DataFrame:
 # 5) ESCRITURA A SILVER
 # ==========================
 
+
 def write_clean_jmp_func(df_clean: DataFrame):
     """
     Escribe el dataset limpio en Silver:
@@ -174,8 +171,7 @@ def write_clean_jmp_func(df_clean: DataFrame):
       - Particionado por country_iso3 y year
     """
     (
-        df_clean.write
-        .mode("overwrite")
+        df_clean.write.mode("overwrite")
         .option("compression", "snappy")
         .partitionBy("country_iso3", "year")
         .parquet(SILVER_JMP_CLEAN_PATH)

@@ -37,8 +37,8 @@ S3_BASE = f"s3a://{BASE_BUCKET}"
 
 # Entradas Silver limpias (ajustables vía la función run())
 SILVER_JMP_CLEAN_PATH = f"{S3_BASE}/silver/jmp/"
-DIM_INDICATOR_PATH    = f"{S3_BASE}/silver/socioeconomic/"
-DIM_CLIMA_PATH        = f"{S3_BASE}/silver/climate_monthly/"
+DIM_INDICATOR_PATH = f"{S3_BASE}/silver/socioeconomic/"
+DIM_CLIMA_PATH = f"{S3_BASE}/silver/climate_monthly/"
 
 # Salida del modelo Silver (dims + facts)
 SILVER_MODEL_BASE_PATH = f"{S3_BASE}/silver/model"
@@ -47,6 +47,7 @@ SILVER_MODEL_BASE_PATH = f"{S3_BASE}/silver/model"
 # ============================================================================
 # 2. LECTURA DE FUENTES
 # ============================================================================
+
 
 def read_sources(spark: SparkSession) -> DFMap:
     """
@@ -86,6 +87,7 @@ def read_sources(spark: SparkSession) -> DFMap:
 
 # ------------------ COUNTRY ------------------
 
+
 def build_country(df_jmp: DataFrame) -> DataFrame:
     """
     Construye la dimensión de país (country).
@@ -97,8 +99,7 @@ def build_country(df_jmp: DataFrame) -> DataFrame:
       - region_name    (por ahora fijo: 'Latin America and Caribbean')
     """
     dim = (
-        df_jmp
-        .select("country_iso3", "country_name")
+        df_jmp.select("country_iso3", "country_name")
         .dropna(subset=["country_name"])
         .distinct()
         .withColumn("country_key", F.monotonically_increasing_id())
@@ -116,6 +117,7 @@ def build_country(df_jmp: DataFrame) -> DataFrame:
 
 # ------------------ RESIDENCE_TYPE ------------------
 
+
 def build_residence_type(df_jmp: DataFrame) -> DataFrame:
     """
     Construye la dimensión residence_type (tipo de residencia).
@@ -126,8 +128,7 @@ def build_residence_type(df_jmp: DataFrame) -> DataFrame:
       - residence_type_desc  (total / urban / rural / unknown)
     """
     dim = (
-        df_jmp
-        .select("residence_type_code", "residence_type_desc")
+        df_jmp.select("residence_type_code", "residence_type_desc")
         .dropna(subset=["residence_type_code"])
         .distinct()
         .withColumn("residence_type_key", F.monotonically_increasing_id())
@@ -143,6 +144,7 @@ def build_residence_type(df_jmp: DataFrame) -> DataFrame:
 
 # ------------------ SERVICE_TYPE ------------------
 
+
 def build_service_type(df_jmp: DataFrame) -> DataFrame:
     """
     Construye la dimensión service_type (tipo de servicio).
@@ -157,8 +159,7 @@ def build_service_type(df_jmp: DataFrame) -> DataFrame:
       - service_type_desc
     """
     dim = (
-        df_jmp
-        .select("service_type_desc")
+        df_jmp.select("service_type_desc")
         .dropna(subset=["service_type_desc"])
         .distinct()
         .withColumn("service_type_key", F.monotonically_increasing_id())
@@ -173,6 +174,7 @@ def build_service_type(df_jmp: DataFrame) -> DataFrame:
 
 # ------------------ SERVICE_LEVEL ------------------
 
+
 def build_service_level(df_jmp: DataFrame) -> DataFrame:
     """
     Construye la dimensión service_level (nivel de servicio).
@@ -182,8 +184,7 @@ def build_service_level(df_jmp: DataFrame) -> DataFrame:
       - service_level_desc
     """
     dim = (
-        df_jmp
-        .select("service_level_desc")
+        df_jmp.select("service_level_desc")
         .dropna(subset=["service_level_desc"])
         .distinct()
         .withColumn("service_level_key", F.monotonically_increasing_id())
@@ -197,6 +198,7 @@ def build_service_level(df_jmp: DataFrame) -> DataFrame:
 
 
 # ------------------ DATE (dim_date) ------------------
+
 
 def build_date_dim(df_jmp: DataFrame, df_climate: DataFrame) -> DataFrame:
     """
@@ -271,8 +273,7 @@ def build_date_dim(df_jmp: DataFrame, df_climate: DataFrame) -> DataFrame:
     dim_date = df_seq.select(F.explode("date_seq").alias("date"))
 
     dim_date = (
-        dim_date
-        .withColumn("year", F.year("date"))
+        dim_date.withColumn("year", F.year("date"))
         .withColumn("month", F.month("date"))
         .withColumn("month_name", F.date_format("date", "MMMM"))
         .withColumn("quarter", F.quarter("date"))
@@ -292,6 +293,7 @@ def build_date_dim(df_jmp: DataFrame, df_climate: DataFrame) -> DataFrame:
 
 # ------------------ INDICATOR ------------------
 
+
 def build_indicator(df_indicator: DataFrame) -> DataFrame:
     """
     Construye la dimensión de indicadores (indicator), derivada de datos
@@ -303,8 +305,7 @@ def build_indicator(df_indicator: DataFrame) -> DataFrame:
       - indicator_name
     """
     dim_indicator = (
-        df_indicator
-        .select("indicator_code", "indicator_name")
+        df_indicator.select("indicator_code", "indicator_name")
         .dropna(subset=["indicator_code", "indicator_name"])
         .distinct()
         .withColumn("indicator_key", F.monotonically_increasing_id())
@@ -320,6 +321,7 @@ def build_indicator(df_indicator: DataFrame) -> DataFrame:
 
 # ------------------ PROVINCE ------------------
 
+
 def build_province(df_climate: DataFrame) -> DataFrame:
     """
     Construye la dimensión de provincias (province), usando datos de clima.
@@ -330,8 +332,7 @@ def build_province(df_climate: DataFrame) -> DataFrame:
       - province_name
     """
     dim_province = (
-        df_climate
-        .select("country_iso3", "province_name")
+        df_climate.select("country_iso3", "province_name")
         .dropna(subset=["country_iso3", "province_name"])
         .distinct()
         .withColumn("province_key", F.monotonically_increasing_id())
@@ -349,26 +350,27 @@ def build_province(df_climate: DataFrame) -> DataFrame:
 # 4. BUILD_DIMS / BUILD_FACTS PARA LA PLANTILLA
 # ============================================================================
 
+
 def build_dims(sources: DFMap) -> DFMap:
     """
     Construye todas las dimensiones del modelo Silver a partir de:
 
       - JMP limpio      -> country, residence_type, service_type, service_level
       - World Bank/Socio-> indicator
-      - Clima mensual   -> province, date 
+      - Clima mensual   -> province, date
     """
     df_jmp = sources["jmp_clean"]
     df_world = sources["world_bank"]
     df_climate = sources["climate"]
 
     dims: DFMap = {
-        "country":        build_country(df_jmp),
+        "country": build_country(df_jmp),
         "residence_type": build_residence_type(df_jmp),
-        "service_type":   build_service_type(df_jmp),
-        "service_level":  build_service_level(df_jmp),
-        "date":           build_date_dim(df_jmp, df_climate),
-        "indicator":      build_indicator(df_world),
-        "province":       build_province(df_climate),
+        "service_type": build_service_type(df_jmp),
+        "service_level": build_service_level(df_jmp),
+        "date": build_date_dim(df_jmp, df_climate),
+        "indicator": build_indicator(df_world),
+        "province": build_province(df_climate),
     }
 
     return dims
@@ -386,6 +388,7 @@ def build_facts(sources: DFMap, dims: DFMap) -> DFMap:
 # 5. ESCRITURA DE DIMENSIONES
 # ============================================================================
 
+
 def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
     """
     Escribe cada dimensión en formato Parquet bajo SILVER_MODEL_BASE_PATH.
@@ -398,8 +401,7 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
         print(f"[WRITE] Guardando dimensión {table_name} en {output_path} ...")
 
         (
-            df.write
-            .mode("overwrite")  # full refresh de la dimensión
+            df.write.mode("overwrite")  # full refresh de la dimensión
             .format("parquet")
             .save(output_path)
         )
@@ -410,6 +412,7 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
 # ============================================================================
 # 6. FUNCIÓN RUN (USADA DESDE main_silver_model.py)
 # ============================================================================
+
 
 def run(
     spark: SparkSession,
@@ -440,11 +443,10 @@ def run(
 
 
 # ============================================================================
-# 7. ENTRYPOINT DIRECTO 
+# 7. ENTRYPOINT DIRECTO
 # ============================================================================
 
 if __name__ == "__main__":
     spark = create_spark_session(app_name="silver_dimensions_job")
     run(spark)
     spark.stop()
-

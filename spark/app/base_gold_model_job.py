@@ -20,6 +20,7 @@ from pyspark.sql import SparkSession, DataFrame
 # 0. SparkSession para la capa GOLD
 # ============================================================
 
+
 def create_spark_session(app_name: str = "Huella_Hidrica_Gold_Model") -> SparkSession:
     """
     Crea y devuelve una SparkSession.
@@ -30,12 +31,7 @@ def create_spark_session(app_name: str = "Huella_Hidrica_Gold_Model") -> SparkSe
         - spark-defaults.conf
         - Dockerfile / conf del contenedor
     """
-    spark = (
-        SparkSession
-        .builder
-        .appName(app_name)
-        .getOrCreate()
-    )
+    spark = SparkSession.builder.appName(app_name).getOrCreate()
 
     # Reducir ruido en los logs
     spark.sparkContext.setLogLevel("WARN")
@@ -45,6 +41,7 @@ def create_spark_session(app_name: str = "Huella_Hidrica_Gold_Model") -> SparkSe
 # ============================================================
 # 1. Clase base para KPIs GOLD
 # ============================================================
+
 
 class BaseGoldKPIJob:
     """
@@ -95,9 +92,7 @@ class BaseGoldKPIJob:
         """
         Nombre corto del KPI.
         """
-        raise NotImplementedError(
-            "Debes implementar kpi_name() en la clase KPI hija."
-        )
+        raise NotImplementedError("Debes implementar kpi_name() en la clase KPI hija.")
 
     def build(self) -> DataFrame:
         """
@@ -108,9 +103,7 @@ class BaseGoldKPIJob:
 
         Debe devolver el DataFrame final listo para escribirse en GOLD.
         """
-        raise NotImplementedError(
-            "Debes implementar build() en la clase KPI hija."
-        )
+        raise NotImplementedError("Debes implementar build() en la clase KPI hija.")
 
     def output_path(self) -> str:
         """
@@ -145,11 +138,7 @@ class BaseGoldKPIJob:
         """
         path = self.output_path()
         self.log(f"Escribiendo resultado en GOLD: {path} (mode={self.write_mode})")
-        (
-            df.write
-            .mode(self.write_mode)
-            .parquet(path)
-        )
+        (df.write.mode(self.write_mode).parquet(path))
 
     def run(self) -> None:
         """

@@ -25,8 +25,7 @@ def create_spark_session(app_name: str = "clean_etl_job") -> SparkSession:
         se toma desde spark-defaults.conf y del IAM Role adjunto a la instancia.
     """
     spark = (
-        SparkSession.builder
-        .appName(app_name)
+        SparkSession.builder.appName(app_name)
         # Overwrite dinámico por partición
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         .config("spark.sql.parquet.compression.codec", "snappy")
@@ -55,7 +54,9 @@ def run_clean_etl(
     df_raw = read_func(spark_session)
 
     if df_raw is None or df_raw.count() == 0:
-        print("ADVERTENCIA: El DataFrame leído está vacío o no se encontró data. Terminando ETL.")
+        print(
+            "ADVERTENCIA: El DataFrame leído está vacío o no se encontró data. Terminando ETL."
+        )
         return
 
     print("[STEP 2/5] Estandarizando datos...")

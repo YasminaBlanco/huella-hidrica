@@ -83,15 +83,9 @@ def read_sources(spark: SparkSession) -> DFMap:
 
     # Dimensiones del modelo Silver
     country_dim = spark.read.parquet(f"{SILVER_MODEL_BASE_PATH}/country")
-    residence_type_dim = spark.read.parquet(
-        f"{SILVER_MODEL_BASE_PATH}/residence_type"
-    )
-    service_type_dim = spark.read.parquet(
-        f"{SILVER_MODEL_BASE_PATH}/service_type"
-    )
-    service_level_dim = spark.read.parquet(
-        f"{SILVER_MODEL_BASE_PATH}/service_level"
-    )
+    residence_type_dim = spark.read.parquet(f"{SILVER_MODEL_BASE_PATH}/residence_type")
+    service_type_dim = spark.read.parquet(f"{SILVER_MODEL_BASE_PATH}/service_type")
+    service_level_dim = spark.read.parquet(f"{SILVER_MODEL_BASE_PATH}/service_level")
     date_dim = spark.read.parquet(f"{SILVER_MODEL_BASE_PATH}/date")
 
     return {
@@ -138,69 +132,53 @@ def build_wash_coverage_fact(
     )
 
     # 2) JOIN country_key (por country_iso3)
-    base = (
-        base.alias("j")
-        .join(
-            df_country.select("country_key", "country_iso3").alias("c"),
-            on="country_iso3",
-            how="left",
-        )
+    base = base.alias("j").join(
+        df_country.select("country_key", "country_iso3").alias("c"),
+        on="country_iso3",
+        how="left",
     )
 
     # 3) JOIN residence_type_key (por residence_type_code)
-    base = (
-        base.alias("j")
-        .join(
-            df_residence_type.select(
-                "residence_type_key",
-                "residence_type_code",
-            ).alias("r"),
-            on="residence_type_code",
-            how="left",
-        )
+    base = base.alias("j").join(
+        df_residence_type.select(
+            "residence_type_key",
+            "residence_type_code",
+        ).alias("r"),
+        on="residence_type_code",
+        how="left",
     )
 
     # 4) JOIN service_type_key (por service_type_desc)
-    base = (
-        base.alias("j")
-        .join(
-            df_service_type.select(
-                "service_type_key",
-                "service_type_desc",
-            ).alias("st"),
-            on="service_type_desc",
-            how="left",
-        )
+    base = base.alias("j").join(
+        df_service_type.select(
+            "service_type_key",
+            "service_type_desc",
+        ).alias("st"),
+        on="service_type_desc",
+        how="left",
     )
 
     # 5) JOIN service_level_key (por service_level_desc)
-    base = (
-        base.alias("j")
-        .join(
-            df_service_level.select(
-                "service_level_key",
-                "service_level_desc",
-            ).alias("sl"),
-            on="service_level_desc",
-            how="left",
-        )
+    base = base.alias("j").join(
+        df_service_level.select(
+            "service_level_key",
+            "service_level_desc",
+        ).alias("sl"),
+        on="service_level_desc",
+        how="left",
     )
 
     # 6) JOIN date_key (año - 31 de diciembre de ese año en dim_date)
     end_of_year_dates = (
-        df_date
-        .filter(F.date_format("date", "MM-dd") == "12-31")
+        df_date.filter(F.date_format("date", "MM-dd") == "12-31")
         .select("year", "date_key")
         .distinct()
     )
 
-    base = (
-        base.alias("j")
-        .join(
-            end_of_year_dates.alias("d"),
-            on="year",
-            how="left",
-        )
+    base = base.alias("j").join(
+        end_of_year_dates.alias("d"),
+        on="year",
+        how="left",
     )
 
     # 7) Surrogate key
@@ -210,11 +188,9 @@ def build_wash_coverage_fact(
     )
 
     # 8) Tipos de datos de métricas
-    fact = (
-        fact
-        .withColumn("population_total", F.col("population_total").cast("bigint"))
-        .withColumn("coverage_pct", F.col("coverage_pct").cast("decimal(5, 2)"))
-    )
+    fact = fact.withColumn(
+        "population_total", F.col("population_total").cast("bigint")
+    ).withColumn("coverage_pct", F.col("coverage_pct").cast("decimal(5, 2)"))
 
     # 9) Selección final
     fact = fact.select(
@@ -262,9 +238,7 @@ def build_facts(sources: DFMap, dims: DFMap) -> DFMap:
         df_date,
     )
 
-    return {
-        "wash_coverage": wash_coverage
-    }
+    return {"wash_coverage": wash_coverage}
 
 
 # =============================================================
@@ -277,15 +251,16 @@ def write_tables(dims: DFMap, facts: DFMap, spark: SparkSession) -> None:
 
     fact = facts.get("wash_coverage")
     if fact is None or fact.rdd.isEmpty():
-        print("No se construyó la tabla wash_coverage o no hay filas. Nada que escribir.")
+        print(
+            "No se construyó la tabla wash_coverage o no hay filas. Nada que escribir."
+        )
         return
 
     output_path = f"{SILVER_MODEL_BASE_PATH}/wash_coverage"
     print(f"[WRITE] Guardando wash_coverage en {output_path} ...")
 
     (
-        fact.write
-        .mode("overwrite")                # overwrite dinámico por partición (Spark config)
+        fact.write.mode("overwrite")  # overwrite dinámico por partición (Spark config)
         .partitionBy("country_key", "date_key")
         .format("parquet")
         .save(output_path)
@@ -318,7 +293,7 @@ def run(
     """
     global SILVER_JMP_CLEAN_PATH, SILVER_MODEL_BASE_PATH, process_year
 
-    # Actualiza rutas globales 
+    # Actualiza rutas globales
     SILVER_JMP_CLEAN_PATH = jmp_clean_path
     SILVER_MODEL_BASE_PATH = silver_model_base_path
 

@@ -21,7 +21,7 @@ Soporta dos modos de ejecución según el contexto:
 from typing import Callable, Dict, Any, Optional
 from pyspark.sql import SparkSession, DataFrame
 
-# Alias para mapear nombres de tablas 
+# Alias para mapear nombres de tablas
 DFMap = Dict[str, DataFrame]
 
 
@@ -35,15 +35,13 @@ def create_spark_session(app_name: str = "Huella_Hidrica_Silver_Model") -> Spark
       - Overwrite dinámico por partición.
     """
     spark = (
-        SparkSession.builder
-        .appName(app_name)
+        SparkSession.builder.appName(app_name)
         # Overwrite dinámico de particiones
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         # Compresión por defecto para Parquet
         .config("spark.sql.parquet.compression.codec", "snappy")
         # Zona horaria consistente
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
+        .config("spark.sql.session.timeZone", "UTC").getOrCreate()
     )
 
     spark.sparkContext.setLogLevel("WARN")
@@ -106,4 +104,3 @@ def run_silver_model_job(
     write_tables_func(dims, facts, spark_session)
 
     print("\nSilver model job completado con éxito.\n")
-
