@@ -21,8 +21,7 @@ Este job NO crea facts; solo dimensiones, y siempre hace FULL REFRESH.
 
 import os
 
-from base_silver_model_job import (DFMap, create_spark_session,
-                                   run_silver_model_job)
+from base_silver_model_job import DFMap, create_spark_session, run_silver_model_job
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
