@@ -26,9 +26,9 @@ BASE_BUCKET = "henry-pf-g2-huella-hidrica"
 EMAIL_TO = ""
 
 # Flags para transformaciones
-UNIQUE_INGEST_FLAG = "ingest_unique_done"
-ANNUAL_INGEST_FLAG = "ingest_annual_done"
-WEEKLY_INGEST_FLAG = "ingest_weekly_done"
+UNIQUE_INGEST_FLAG = "ingest_unique_done_OK"
+ANNUAL_INGEST_FLAG = "ingest_annual_done_OK"
+WEEKLY_INGEST_FLAG = "ingest_weekly_done_OK"
 
 # ----------------- Logger -----------------
 logger = logging.getLogger("main_ingest_logger")
