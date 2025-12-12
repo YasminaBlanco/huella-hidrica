@@ -1,15 +1,13 @@
-resource "aws_default_vpc" "default" {}
-
 # ------------------------------------------
-# Security Group para SSH
+# Security Group para SSH (Spark)
 # ------------------------------------------
 
 resource "aws_security_group" "spark_ssh_sg" {
-  name        = "spark-ssh-sg"
+  name        = "pf-spark-ssh-sg"
   description = "SSH access for Spark EC2"
   vpc_id      = aws_default_vpc.default.id
 
-  # SSH desde cualquier lugar 
+  # SSH desde cualquier lugar (solo dev; en prod limitar IP)
   ingress {
     description = "SSH"
     from_port   = 22
@@ -40,26 +38,21 @@ data "aws_ami" "ubuntu_24_04" {
   most_recent = true
   owners      = ["099720109477"] # Canonical (Ubuntu)
 
-  # Nombre de la imagen: Ubuntu 24.04 noble, SSD gp3
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-*-*"]
   }
 
-  # Virtualización HVM (estándar en EC2)
   filter {
     name   = "virtualization-type"
     values = ["hvm"]
   }
 
-  # Asegurar que sea arquitectura x86_64 (para c7i-flex.large)
   filter {
     name   = "architecture"
     values = ["x86_64"]
   }
 }
-
-
 
 # ---------------------------------------------
 # Instancia EC2 para Spark
@@ -67,7 +60,7 @@ data "aws_ami" "ubuntu_24_04" {
 
 resource "aws_instance" "spark" {
   ami                    = data.aws_ami.ubuntu_24_04.id
-  instance_type          = "c7i-flex.large"
+  instance_type          = "m7i-flex.large"
   iam_instance_profile   = aws_iam_instance_profile.ec2_spark_s3_profile.name
   key_name               = var.ec2_key_name
   vpc_security_group_ids = [aws_security_group.spark_ssh_sg.id]
@@ -84,4 +77,47 @@ resource "aws_instance" "spark" {
     Project     = "huella-hidrica"
     Environment = "dev"
   }
+
+  # Script de arranque (user_data): instala Docker + Docker Compose 
+  user_data = <<-EOF
+    #!/bin/bash
+    set -xe
+
+    echo "==== [Spark EC2] Inicio de user_data ===="
+
+    # Actualizar paquetes
+    sudo apt-get update -y
+
+    echo "==== [Spark EC2] Instalando dependencias para Docker ===="
+    sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+    # Prepara keyrings para repositorio oficial de Docker
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    sudo apt-get update -y
+
+    echo "==== [Spark EC2] Instalando Docker Engine y Docker Compose plugin ===="
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    # Permitir usar docker sin sudo (se aplica al siguiente login)
+    sudo usermod -aG docker ubuntu || true
+
+    echo "==== [Spark EC2] Verificando versiones de Docker y Docker Compose ===="
+    echo ">> docker --version"
+    docker --version || echo "Docker no disponible"
+
+    echo ">> docker compose version"
+    docker compose version || echo "Docker Compose no disponible"
+
+    echo "==== [Spark EC2] Fin de user_data ===="
+  EOF
 }
+
+
