@@ -13,6 +13,14 @@ El flujo de trabajo principal del pipeline se compone de tres módulos:
 
 Cada módulo está dockerizado para asegurar despliegues consistentes y reproducibles 📦.
 
+### Diagramas del Pipeline ETL
+
+![Diagrama ETL 1](assets/etl-01.png)
+*Figura 1: Arquitectura general del pipeline ETL.*
+
+![Diagrama ETL 2](assets/etl-02.png)
+*Figura 2: Ejecución correctas del flujo de  tareas en Airflow.*
+
 ## 2. Objetivos
 
 - Coordinar la ejecución de la ingesta y transformaciones según la periodicidad definida (única, anual, semanal).  
