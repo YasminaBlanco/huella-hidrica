@@ -1,0 +1,32 @@
+name: Deploy Orch
+
+on:
+  pull_request
+    branches: [ main ]
+    paths:
+      - "orch/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: docker build -t orch-app ./orch
+
+      # - name: Transfer image to EC2
+      #   run: |
+      #     docker save orch-app | bzip2 | \
+      #     ssh -o StrictHostKeyChecking=no -i "${{ secrets.EC2_ORCH_KEY }}" ec2-user@${{ secrets.EC2_ORCH_IP }} \
+      #     'bunzip2 | docker load'
+
+      # - name: Restart container
+      #   run: |
+      #     ssh -o StrictHostKeyChecking=no -i "${{ secrets.EC2_ORCH_KEY }}" ec2-user@${{ secrets.EC2_ORCH_IP }} \
+      #     'docker-compose -f /home/ec2-user/orch/docker-compose.prod.yml up -d'
