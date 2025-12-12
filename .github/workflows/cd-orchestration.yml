@@ -18,7 +18,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build Docker image
-        run: docker build -t orch-app ./orch
+        run: docker build -t orch-app ./orch/airflow
 
       - name: Run Orch container
         run: docker run -d orch-app
