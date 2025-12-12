@@ -1,7 +1,7 @@
-name: Deploy Orch
+name: Deploy Orchestrator
 
 on:
-  pull_request
+  pull_request:
     branches: [ main ]
     paths:
       - "orch/**"
@@ -19,6 +19,9 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t orch-app ./orch
+
+      - name: Run Orch container
+        run: docker run -d orch-app
 
       # - name: Transfer image to EC2
       #   run: |
