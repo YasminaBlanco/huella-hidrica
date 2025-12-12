@@ -1,12 +1,10 @@
-
-# ----------------------------------------
-# Role IAM para EC2 con acceso S3 
-# ---------------------------------------
+#---------------------------------------------
+# IAM Role para EC2 (Spark)
+#---------------------------------------------
 
 resource "aws_iam_role" "ec2_spark_s3_role" {
-  name = "ec2-spark-s3-role"
+  name = "pf-ec2-spark-s3-role"
 
-  # Permitir que EC2 asuma este role
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -27,15 +25,18 @@ resource "aws_iam_role" "ec2_spark_s3_role" {
   }
 }
 
-# Política personalizada de mínimo privilegio 
-resource "aws_iam_policy" "ec2_spark_s3_least_priv" {
-  name        = "ec2-spark-s3-least-priv"
-  description = "Acceso mínimo desde EC2 (Spark) al bucket henry-pf-g2-huella-hidrica"
+#---------------------------------------------
+# Política de mínimo privilegio hacia el Data Lake
+#---------------------------------------------
 
+resource "aws_iam_policy" "ec2_spark_s3_least_priv" {
+  name        = "pf-ec2-spark-s3-least-priv"
+  description = "Acceso mínimo desde EC2 (Spark/API) al Data Lake en S3"
+
+  # usamos aws_s3_bucket.data_lake.arn
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Permitir listar solo ese bucket y obtener su región
       {
         Sid    = "ListBucket"
         Effect = "Allow"
@@ -43,12 +44,10 @@ resource "aws_iam_policy" "ec2_spark_s3_least_priv" {
           "s3:ListBucket",
           "s3:GetBucketLocation"
         ]
-        Resource = "arn:aws:s3:::henry-pf-g2-huella-hidrica"
+        Resource = aws_s3_bucket.data_lake.arn
       },
-
-      # Permitir leer/escribir objetos solo en estos prefijos
       {
-        Sid    = "RWDataObjects"
+        Sid    = "DataLakeObjects"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
@@ -56,25 +55,32 @@ resource "aws_iam_policy" "ec2_spark_s3_least_priv" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws:s3:::henry-pf-g2-huella-hidrica/bronze/*",
-          "arn:aws:s3:::henry-pf-g2-huella-hidrica/silver/*",
-          "arn:aws:s3:::henry-pf-g2-huella-hidrica/gold/*",
-          "arn:aws:s3:::henry-pf-g2-huella-hidrica/logs/*",
-          "arn:aws:s3:::henry-pf-g2-huella-hidrica/scripts/*"
+          "${aws_s3_bucket.data_lake.arn}/bronze/*",
+          "${aws_s3_bucket.data_lake.arn}/silver/*",
+          "${aws_s3_bucket.data_lake.arn}/gold/*",
+          "${aws_s3_bucket.data_lake.arn}/logs/*",
+          "${aws_s3_bucket.data_lake.arn}/scripts/*"
         ]
       }
     ]
   })
 }
 
-# Adjuntar la política personalizada al role
+#---------------------------------------------
+# Adjuntar la policy al Role
+#---------------------------------------------
+
 resource "aws_iam_role_policy_attachment" "ec2_spark_s3_attach" {
   role       = aws_iam_role.ec2_spark_s3_role.name
   policy_arn = aws_iam_policy.ec2_spark_s3_least_priv.arn
 }
 
-# Instance Profile que usará la instancia EC2
+#---------------------------------------------
+# Instance Profile para usar en las EC2
+#---------------------------------------------
+
 resource "aws_iam_instance_profile" "ec2_spark_s3_profile" {
-  name = "ec2-spark-s3-role"
+  name = "pf-ec2-spark-s3-profile-v2"
   role = aws_iam_role.ec2_spark_s3_role.name
 }
+

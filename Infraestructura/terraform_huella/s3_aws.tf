@@ -2,23 +2,23 @@
 # 1) Bucket raíz del Data Lake
 # --------------------------------
 
-# Crea un bucket S3 
 resource "aws_s3_bucket" "data_lake" {
+  # Nombre viene de var.project_bucket_name
   bucket = var.project_bucket_name
-  # Tags que se aplican al bucket 
+
+  # Tags del bucket
   tags = {
-    Name        = var.project_bucket_name # Nombre legible del bucket
-    Project     = "huella-hidrica"        # Nombre del proyecto
-    Environment = "dev"                   # Ambiente 
+    Name        = var.project_bucket_name
+    Project     = "huella-hidrica"
+    Environment = "dev"
   }
 }
 
 # -----------------------------------------
-# 2) Lista de "carpetas" internas
+# 2) "Carpetas" internas (Medallion)
 # -----------------------------------------
 
 locals {
-  # Nombre de las carpetas para la arquitectura Medallion
   prefixes = [
     "bronze/",
     "silver/",
@@ -35,11 +35,10 @@ resource "aws_s3_object" "folders" {
   key     = each.value
   content = ""
 
-  # Tags para identificar las "carpetas".
   tags = {
     Project     = "huella-hidrica"
     Environment = "dev"
-    # "bronze/", "silver/", etc.
-    Layer = each.value
+    Layer       = each.value
   }
 }
+
