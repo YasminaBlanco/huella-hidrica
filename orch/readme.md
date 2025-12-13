@@ -16,7 +16,7 @@ Cada módulo está dockerizado para asegurar despliegues consistentes y reproduc
 ### Diagramas del Pipeline ETL
 
 ![Diagrama ETL 1](assets/etl-01.png)
-*Figura 1: Arquitectura general del pipeline ETL.*
+*Figura 1: Pipeline ETL en Airflow.*
 
 ![Diagrama ETL 2](assets/etl-02.png)
 *Figura 2: Ejecución correctas del flujo de  tareas en Airflow.*
@@ -37,6 +37,9 @@ Cada módulo está dockerizado para asegurar despliegues consistentes y reproduc
 - Logs persistentes y DAGs montados como volúmenes de Docker  
 - Ejecuta transformaciones en **PySpark** mediante SSH a instancia EC2  
 - Envío de notificaciones por correo usando SMTP (Mailgun)  
+
+![Diagrama ETL 3](assets/esquema-gral.png)
+*Figura 3. Esquema general.*
 
 ### 3.1 DAG `main_ingest`
 
